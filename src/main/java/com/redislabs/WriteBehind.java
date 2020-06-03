@@ -1,9 +1,6 @@
 package com.redislabs;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.Arrays;
+import java.io.Serializable;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -20,17 +17,21 @@ import gears.readers.StreamReader;
 import gears.records.HashRecord;
 import gears.records.StringRecord;
 
-public class WriteBehind {
+public class WriteBehind implements Serializable{
 
-  private static final AtomicReference<Session> sessionRef = new AtomicReference<>();
+  private static final long serialVersionUID = 1L;
+  
+  private final transient AtomicReference<Session> sessionRef       = new AtomicReference<>();
+  private final transient AtomicReference<RGHibernate> hibernateRef = new AtomicReference<>();
 
-  public static void main() throws Exception {
-    registerOnChanges();
-    registerOnStream();
-
+  public static void main() {
+    WriteBehind wb = new WriteBehind();
+    wb.registerOnChanges();
+    wb.registerOnStream();
+    wb.registerOnCommands();
   }
 
-  private static void registerOnChanges() {
+  private void registerOnChanges() {
     KeysReader reader = new KeysReader("*").setEventTypes(new String[] { "hset" }).setReadValues(true).setNoScan(false);
 
     new GearsBuilder(reader).foreach(r -> {
@@ -50,21 +51,8 @@ public class WriteBehind {
     }).register();
   }
 
-  private static void registerOnStream() {
-    StreamReader streamReader = new StreamReader(ExecutionMode.ASYNC_LOCAL, () -> {
-      System.setProperty("javax.xml.bind.JAXBContextFactory", "org.eclipse.persistence.jaxb.JAXBContextFactory");
-      ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
-      try {
-        Thread.currentThread().setContextClassLoader(WriteBehind.class.getClassLoader());
-
-        RGHibernate rgHibernate = new RGHibernate(getConfig("hibernate.cfg.xml"));
-        rgHibernate.addMapping(getConfig("Professor.hbm.xml"));
-        rgHibernate.addMapping(getConfig("Student.hbm.xml"));
-        sessionRef.set(rgHibernate.openSession());
-      } finally {
-        Thread.currentThread().setContextClassLoader(contextClassLoader);
-      }
-    });
+  private void registerOnStream() {
+    StreamReader streamReader = new StreamReader(ExecutionMode.ASYNC_LOCAL, ()->{});
 
     new GearsBuilder(streamReader).foreach(r -> {
       HashRecord value = (HashRecord) ((HashRecord) r).get("value");
@@ -80,9 +68,40 @@ public class WriteBehind {
 
     }).register();
   }
+  
+  private void registerOnCommands() {
+    // Register on set schema
+    KeysReader readerSchema = new KeysReader("__schema").setEventTypes(new String[] { "set" }).setReadValues(true).setNoScan(false);
+    new GearsBuilder(readerSchema).foreach(r -> {
+      HashRecord record = (HashRecord)r; 
+      StringRecord value = (StringRecord)record.get("value");
+      
+      RGHibernate rgHibernate = hibernateRef.get();
+      rgHibernate.addMapping(value.toString());
+      Session orgSession = sessionRef.getAndSet(rgHibernate.openSession());
+      if(orgSession!=null) {
+        orgSession.close();
+      }
+    }).register();
+    
+    
+    // Register on set connection 
+    KeysReader readerConnection = new KeysReader("__connection").setEventTypes(new String[] { "set" }).setReadValues(true).setNoScan(false);
+    new GearsBuilder(readerConnection).foreach(r -> {
+      System.setProperty("javax.xml.bind.JAXBContextFactory", "org.eclipse.persistence.jaxb.JAXBContextFactory");
+      ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+      try {
+        Thread.currentThread().setContextClassLoader(WriteBehind.class.getClassLoader());
 
-  private static String getConfig(String file) {
-    InputStream inputStream = WriteBehind.class.getClassLoader().getResourceAsStream(file);
-    return new BufferedReader(new InputStreamReader(inputStream)).lines().collect(Collectors.joining("\n"));
+        HashRecord record = (HashRecord)r; 
+        StringRecord value = (StringRecord)record.get("value");
+        
+        hibernateRef.set( new RGHibernate(value.toString()));
+
+      } finally {
+        Thread.currentThread().setContextClassLoader(contextClassLoader);
+      }
+    }).register();
   }
+  
 }

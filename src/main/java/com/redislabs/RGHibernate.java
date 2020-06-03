@@ -9,8 +9,8 @@ import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 
 public class RGHibernate {
 
-  private static MetadataSources sources;
-  private static SessionFactory sessionFactory;
+  private final MetadataSources sources;
+  private SessionFactory sessionFactory;
 
   public RGHibernate(String configuration) {
       StandardServiceRegistry registry = new StandardServiceRegistryBuilder()
