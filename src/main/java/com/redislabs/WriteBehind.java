@@ -26,7 +26,7 @@ public class WriteBehind {
 
   public static void main() throws Exception {
     registerOnChanges();
-//    registerOnStream();
+    registerOnStream();
 
   }
 
@@ -34,13 +34,19 @@ public class WriteBehind {
     KeysReader reader = new KeysReader("*").setEventTypes(new String[] { "hset" }).setReadValues(true).setNoScan(false);
 
     new GearsBuilder(reader).foreach(r -> {
-      HashRecord value = (HashRecord) ((HashRecord) r).get("value");
-
-      Stream<String> commandStream = Stream.of("XADD", "stream", "*");
-      String[] command = Stream.concat(commandStream, value.getHashMap().entrySet().stream()
-          .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue().toString()))).toArray(String[]::new);
+      HashRecord record = (HashRecord)r; 
+      HashRecord value = (HashRecord)record.get("value");
+      StringRecord key = (StringRecord)record.get("key");
+      String[] keySplit = key.toString().split(":");
       
-      GearsBuilder.execute(command);
+      Stream<String> commandStream = Stream.of("XADD", "stream", "*", "entityName", keySplit[0],  "id", keySplit[1]);
+      Stream<String> fieldsStream = value.getHashMap().entrySet().stream()
+          .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue().toString())); 
+      
+      String[] command = Stream.concat(commandStream, fieldsStream).toArray(String[]::new);
+      
+      GearsBuilder.execute(command); // Write to stream 
+      
     }).register();
   }
 
@@ -63,16 +69,12 @@ public class WriteBehind {
     new GearsBuilder(streamReader).foreach(r -> {
       HashRecord value = (HashRecord) ((HashRecord) r).get("value");
 
-      Map map = value.getHashMap().entrySet().stream()
+      Map<String, String> map = value.getHashMap().entrySet().stream()
           .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toString()));
-
-      StringRecord key = (StringRecord) ((HashRecord) r).get("key");
-      String[] keySplit = key.toString().split(":");
-      map.put("id", Integer.valueOf(keySplit[1]));
 
       Session session = sessionRef.get();
       Transaction transaction = session.beginTransaction();
-      session.saveOrUpdate(keySplit[0], map);
+      session.saveOrUpdate(map.remove("entityName"), map);
       transaction.commit();
       session.clear();
 
