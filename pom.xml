@@ -54,7 +54,7 @@
 		<dependency>
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId>
-			<version>8.0.13</version>
+			<version>8.0.20</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
@@ -70,7 +70,7 @@
 		<dependency>
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId>
-			<version>8.0.13</version>
+			<version>8.0.20</version>
 		</dependency>
 		<dependency>
 		    <groupId>javax.xml.bind</groupId>
