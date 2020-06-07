@@ -11,7 +11,8 @@ import org.hibernate.Session;
 import org.hibernate.Transaction;
 
 import gears.GearsBuilder;
-import gears.readers.ExecutionMode;
+import gears.ExecutionMode;
+import gears.records.KeysReaderRecord;
 import gears.readers.KeysReader;
 import gears.readers.StreamReader;
 import gears.records.HashRecord;
@@ -35,13 +36,13 @@ public class WriteBehind implements Serializable{
     KeysReader reader = new KeysReader("*").setEventTypes(new String[] { "hset" }).setReadValues(true).setNoScan(false);
 
     new GearsBuilder(reader).foreach(r -> {
-      HashRecord record = (HashRecord)r; 
-      HashRecord value = (HashRecord)record.get("value");
-      StringRecord key = (StringRecord)record.get("key");
-      String[] keySplit = key.toString().split(":");
+      KeysReaderRecord record = (KeysReaderRecord)r; 
+      Map<String, String> value = record.getHashVal();
+      String key = record.getKey();
+      String[] keySplit = key.split(":");
       
       Stream<String> commandStream = Stream.of("XADD", "stream", "*", "entityName", keySplit[0],  "id", keySplit[1]);
-      Stream<String> fieldsStream = value.getHashMap().entrySet().stream()
+      Stream<String> fieldsStream = value.entrySet().stream()
           .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue().toString())); 
       
       String[] command = Stream.concat(commandStream, fieldsStream).toArray(String[]::new);
@@ -52,7 +53,7 @@ public class WriteBehind implements Serializable{
   }
 
   private void registerOnStream() {
-    StreamReader streamReader = new StreamReader(ExecutionMode.ASYNC_LOCAL, ()->{});
+    StreamReader streamReader = new StreamReader();
 
     new GearsBuilder(streamReader).foreach(r -> {
       HashRecord value = (HashRecord) ((HashRecord) r).get("value");
@@ -73,11 +74,11 @@ public class WriteBehind implements Serializable{
     // Register on set schema
     KeysReader readerSchema = new KeysReader("__schema").setEventTypes(new String[] { "set" }).setReadValues(true).setNoScan(false);
     new GearsBuilder(readerSchema).foreach(r -> {
-      HashRecord record = (HashRecord)r; 
-      StringRecord value = (StringRecord)record.get("value");
+      KeysReaderRecord record = (KeysReaderRecord)r; 
+      String value = record.getStringVal();
       
       RGHibernate rgHibernate = hibernateRef.get();
-      rgHibernate.addMapping(value.toString());
+      rgHibernate.addMapping(value);
       Session orgSession = sessionRef.getAndSet(rgHibernate.openSession());
       if(orgSession!=null) {
         orgSession.close();
@@ -93,10 +94,10 @@ public class WriteBehind implements Serializable{
       try {
         Thread.currentThread().setContextClassLoader(WriteBehind.class.getClassLoader());
 
-        HashRecord record = (HashRecord)r; 
-        StringRecord value = (StringRecord)record.get("value");
+        KeysReaderRecord record = (KeysReaderRecord)r; 
+        String value = record.getStringVal();
         
-        hibernateRef.set( new RGHibernate(value.toString()));
+        hibernateRef.set( new RGHibernate(value));
 
       } finally {
         Thread.currentThread().setContextClassLoader(contextClassLoader);
