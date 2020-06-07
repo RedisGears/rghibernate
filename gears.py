@@ -3,7 +3,7 @@ import redis
 
 conn = redis.Redis()
 
-with open('./target/rghibernate-0.0.1-SNAPSHOT-jar-with-dependencies.jar', 'rb') as f:
+with open('./target/rghibernate-0.0.2-SNAPSHOT-jar-with-dependencies.jar', 'rb') as f:
     data = f.read()
     start = time.time()
     res = conn.execute_command('rg.jexecute', 'com.redislabs.WriteBehind', data)
