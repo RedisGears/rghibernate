@@ -11,7 +11,6 @@ import org.hibernate.Session;
 import org.hibernate.Transaction;
 
 import gears.GearsBuilder;
-import gears.ExecutionMode;
 import gears.records.KeysReaderRecord;
 import gears.readers.CommandReader;
 import gears.readers.KeysReader;
@@ -28,13 +27,13 @@ public class WriteBehind implements Serializable{
 
   public static void main() {
     WriteBehind wb = new WriteBehind();
-    wb.registerOnChanges();
+//    wb.registerOnChanges();
     wb.registerOnStream();
     wb.registerOnCommands();
   }
 
-  private void registerOnChanges() {
-    KeysReader reader = new KeysReader("*").setEventTypes(new String[] { "hset" }).setReadValues(true).setNoScan(false);
+  private void registerOnChanges(String prefix) {
+    KeysReader reader = new KeysReader(prefix + "*").setEventTypes(new String[] { "hset" }).setReadValues(true).setNoScan(false);
 
     new GearsBuilder(reader).foreach(r -> {
       KeysReaderRecord record = (KeysReaderRecord)r; 
@@ -81,7 +80,9 @@ public class WriteBehind implements Serializable{
       StringRecord value = (StringRecord)args[1];
       
       RGHibernate rgHibernate = hibernateRef.get();
-      rgHibernate.addMapping(value.toString());
+      String entity = rgHibernate.addMapping(value.toString());
+      registerOnChanges(entity);
+      
       Session orgSession = sessionRef.getAndSet(rgHibernate.openSession());
       if(orgSession!=null) {
         orgSession.close();
