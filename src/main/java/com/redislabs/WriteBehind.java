@@ -10,6 +10,7 @@ import java.util.stream.Stream;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 
+import gears.ExecutionMode;
 import gears.GearsBuilder;
 import gears.records.KeysReaderRecord;
 import gears.readers.CommandReader;
@@ -27,13 +28,12 @@ public class WriteBehind implements Serializable{
 
   public static void main() {
     WriteBehind wb = new WriteBehind();
-//    wb.registerOnChanges();
     wb.registerOnStream();
     wb.registerOnCommands();
   }
 
   private void registerOnChanges(String prefix) {
-    KeysReader reader = new KeysReader(prefix + "*").setEventTypes(new String[] { "hset" }).setReadValues(true).setNoScan(false);
+    KeysReader reader = new KeysReader(prefix + ":*").setEventTypes(new String[] { "hset" }).setReadValues(true).setNoScan(false);
 
     new GearsBuilder(reader).foreach(r -> {
       KeysReaderRecord record = (KeysReaderRecord)r; 
@@ -43,13 +43,13 @@ public class WriteBehind implements Serializable{
       
       Stream<String> commandStream = Stream.of("XADD", "stream", "*", "entityName", keySplit[0],  "id", keySplit[1]);
       Stream<String> fieldsStream = value.entrySet().stream()
-          .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue().toString())); 
+          .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue())); 
       
       String[] command = Stream.concat(commandStream, fieldsStream).toArray(String[]::new);
       
       GearsBuilder.execute(command); // Write to stream 
       
-    }).register();
+    }).register(ExecutionMode.SYNC);
   }
 
   private void registerOnStream() {
@@ -73,9 +73,8 @@ public class WriteBehind implements Serializable{
   private void registerOnCommands() {
     // Register on set schema
     CommandReader readerSchema = new CommandReader().setTrigger("set_schema");
+    
     new GearsBuilder(readerSchema).foreach(r -> {
-      
-
       Object[] args = (Object[])r; 
       StringRecord value = (StringRecord)args[1];
       
@@ -87,7 +86,7 @@ public class WriteBehind implements Serializable{
       if(orgSession!=null) {
         orgSession.close();
       }
-    }).register();
+    }).register(ExecutionMode.SYNC);
     
     
     // Register on set connection 
@@ -105,7 +104,7 @@ public class WriteBehind implements Serializable{
       } finally {
         Thread.currentThread().setContextClassLoader(contextClassLoader);
       }
-    }).register();
+    }).register(ExecutionMode.SYNC);
   }
   
 }

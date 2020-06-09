@@ -19,12 +19,11 @@ public class RGHibernate {
       sources = new MetadataSources(registry);
   }
 
-
   public String addMapping(String mapping) {
     sources.addURL(InMemoryURLFactory.getInstance().build("mapping", mapping));    
     Metadata metadata = sources.getMetadataBuilder().build();
     sessionFactory = metadata.getSessionFactoryBuilder().build();
-    return metadata.getEntityBindings().iterator().next().getClassName();
+    return metadata.getEntityBindings().iterator().next().getEntityName();
   }
 
   public Session openSession() {
