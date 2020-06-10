@@ -32,3 +32,26 @@ and
     </dependency>
   </dependencies>
 ```
+
+
+### Getting started
+
+```bash
+# Deploy rghibernate as RedisGears function
+python3 gears.py 
+
+# Set the MySQL connection
+redis-cli -x RG.TRIGGER set_connection < ./src/test/resources/hibernate.cfg.xml
+
+# Set the Professor mapping
+redis-cli -x RG.TRIGGER set_schema < ./src/test/resources/Professor.hbm.xml
+
+# Write a proffesor to Redis
+redis-cli hset Professor:123 firstName John lastName Phil email jhon.phil@tau.com
+
+# Set the Student mapping
+redis-cli -x RG.TRIGGER set_schema < ./src/test/resources/Student.hbm.xml
+
+# Write a student to Redis
+redis-cli hset Student:543 firstName Dan lastName Shon email dan.shon@tau.com
+```
