@@ -50,7 +50,13 @@ public class WriteBehind implements Serializable{
       
       GearsBuilder.execute(command); // Write to stream 
       
-    }).register(ExecutionMode.SYNC);
+    }).register(ExecutionMode.SYNC, () -> {
+      // Init the session here so it will happen on each shard
+      Session orgSession = WriteBehind.sessionRef.getAndSet(WriteBehind.hibernateRef.get().openSession());
+      if(orgSession != null) {
+        orgSession.close();
+      }
+    });
   }
 
   private static void registerOnStream() {
@@ -89,10 +95,6 @@ public class WriteBehind implements Serializable{
         
         registerOnChanges(entity);
         
-        Session orgSession = WriteBehind.sessionRef.getAndSet(rgHibernate.openSession());
-        if(orgSession != null) {
-          orgSession.close();
-        }
         return "OK";
       } finally {
         Thread.currentThread().setContextClassLoader(contextClassLoader);
