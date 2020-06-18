@@ -29,12 +29,15 @@ public class WriteBehind implements Serializable{
     WriteBehind.registerOnCommands();
   }
 
-  private static void registerOnChanges(String prefix) {
+  private static void registerOnChanges(String mapping) {
     
-    KeysReader reader = new KeysReader(prefix + ":*")
+    String entity = addEntity(mapping);
+    KeysReader reader = new KeysReader(entity + ":*")
         .setEventTypes(new String[] { "hset" })
         .setReadValues(true)
         .setNoScan(false);
+    
+    String orgHashTag = GearsBuilder.hashtag();
 
     new GearsBuilder(reader).foreach(r -> {
       KeysReaderRecord record = (KeysReaderRecord)r; 
@@ -51,6 +54,10 @@ public class WriteBehind implements Serializable{
       GearsBuilder.execute(command); // Write to stream 
       
     }).register(ExecutionMode.SYNC, () -> {
+      // All shards but the original shard should set the mapping
+      if(!GearsBuilder.hashtag().contentEquals( orgHashTag)) {
+        addEntity(mapping);
+      }
       // Init the session here so it will happen on each shard
       Session orgSession = WriteBehind.sessionRef.getAndSet(WriteBehind.hibernateRef.get().openSession());
       if(orgSession != null) {
@@ -78,6 +85,18 @@ public class WriteBehind implements Serializable{
     }).register();
   }
   
+  private static String addEntity(String mapping) {
+    ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+    try {
+      Thread.currentThread().setContextClassLoader(WriteBehind.class.getClassLoader());
+      RGHibernate rgHibernate = WriteBehind.hibernateRef.get();
+      return rgHibernate.addMapping(mapping);
+      
+    } finally {
+      Thread.currentThread().setContextClassLoader(contextClassLoader);
+    }
+  }
+  
   private static void registerOnCommands() {
     // Register on set schema
     CommandReader readerSchema = new CommandReader().setTrigger("set_schema");
@@ -86,19 +105,10 @@ public class WriteBehind implements Serializable{
       Object[] args = (Object[])r; 
       byte[] value = (byte[]) args[1];
       
-      ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
-      try {
-        Thread.currentThread().setContextClassLoader(WriteBehind.class.getClassLoader());
-        
-        RGHibernate rgHibernate = WriteBehind.hibernateRef.get();
-        String entity = rgHibernate.addMapping(new String(value));
-        
-        registerOnChanges(entity);
-        
-        return "OK";
-      } finally {
-        Thread.currentThread().setContextClassLoader(contextClassLoader);
-      }
+
+      registerOnChanges(new String(value));
+      
+      return "OK";
     }).register(ExecutionMode.SYNC);
     
     
