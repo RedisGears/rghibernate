@@ -1,8 +1,6 @@
 [![license](https://img.shields.io/github/license/RedisGears/rghibernate.svg)](https://github.com/RedisGears/rghibernate/blob/master/LICENSE)
 [![release](https://img.shields.io/github/release/RedisGears/rghibernate.svg?sort=semver)](https://github.com/RedisGears/rghibernate/latest)
 [![CircleCI](https://circleci.com/gh/RedisGears/rghibernate/tree/master.svg?style=svg)](https://circleci.com/gh/RedisGears/rghibernate/tree/master)
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/com.redislabs/rghibernate/badge.svg)](https://maven-badges.herokuapp.com/maven-central/com.redislabs/rghibernate)
-[![Javadocs](https://www.javadoc.io/badge/com.redislabs/rghibernate.svg)](https://www.javadoc.io/doc/com.redislabs/rghibernate)
 [![Codecov](https://codecov.io/gh/RedisGears/rghibernate/branch/master/graph/badge.svg)](https://codecov.io/gh/RedisGears/rghibernate)
 [![Known Vulnerabilities](https://snyk.io/test/github/RedisGears/rghibernate/badge.svg?targetFile=pom.xml)](https://snyk.io/test/github/RedisGears/rghibernate?targetFile=pom.xml)
 
@@ -33,4 +31,27 @@ and
       <version>0.0.3-SNAPSHOT</version>
     </dependency>
   </dependencies>
+```
+
+
+### Getting started
+
+```bash
+# Deploy rghibernate as RedisGears function
+python3 gears.py 
+
+# Set the MySQL connection
+redis-cli -x RG.TRIGGER set_connection < ./src/test/resources/hibernate.cfg.xml
+
+# Set the Professor mapping
+redis-cli -x RG.TRIGGER set_schema < ./src/test/resources/Professor.hbm.xml
+
+# Write a proffesor to Redis
+redis-cli hset Professor:123 firstName John lastName Phil email jhon.phil@tau.com
+
+# Set the Student mapping
+redis-cli -x RG.TRIGGER set_schema < ./src/test/resources/Student.hbm.xml
+
+# Write a student to Redis
+redis-cli hset Student:543 firstName Dan lastName Shon email dan.shon@tau.com
 ```
