@@ -21,16 +21,15 @@ public class WriteBehind implements Serializable{
 
   private static final long serialVersionUID = 1L;
   
-  private final transient AtomicReference<Session> sessionRef       = new AtomicReference<>();
-  private final transient AtomicReference<RGHibernate> hibernateRef = new AtomicReference<>();
+  private static final AtomicReference<Session> sessionRef       = new AtomicReference<>();
+  private static final AtomicReference<RGHibernate> hibernateRef = new AtomicReference<>();
 
   public static void main() {
-    WriteBehind wb = new WriteBehind();
-    wb.registerOnStream();
-    wb.registerOnCommands();
+    WriteBehind.registerOnStream();
+    WriteBehind.registerOnCommands();
   }
 
-  private void registerOnChanges(String prefix) {
+  private static void registerOnChanges(String prefix) {
     
     KeysReader reader = new KeysReader(prefix + ":*")
         .setEventTypes(new String[] { "hset" })
@@ -54,7 +53,7 @@ public class WriteBehind implements Serializable{
     }).register(ExecutionMode.SYNC);
   }
 
-  private void registerOnStream() {
+  private static void registerOnStream() {
     StreamReader streamReader = new StreamReader();
 
     new GearsBuilder(streamReader).foreach(r -> {
@@ -64,7 +63,7 @@ public class WriteBehind implements Serializable{
       Map<String, String> map = value.entrySet().stream()
           .collect(Collectors.toMap(Map.Entry::getKey, e -> new String(e.getValue())));
 
-      Session session = sessionRef.get();
+      Session session = WriteBehind.sessionRef.get();
       Transaction transaction = session.beginTransaction();
       session.saveOrUpdate(map.remove("entityName"), map);
       transaction.commit();
@@ -73,7 +72,7 @@ public class WriteBehind implements Serializable{
     }).register();
   }
   
-  private void registerOnCommands() {
+  private static void registerOnCommands() {
     // Register on set schema
     CommandReader readerSchema = new CommandReader().setTrigger("set_schema");
     
@@ -85,12 +84,12 @@ public class WriteBehind implements Serializable{
       try {
         Thread.currentThread().setContextClassLoader(WriteBehind.class.getClassLoader());
         
-        RGHibernate rgHibernate = hibernateRef.get();
+        RGHibernate rgHibernate = WriteBehind.hibernateRef.get();
         String entity = rgHibernate.addMapping(new String(value));
         
         registerOnChanges(entity);
         
-        Session orgSession = sessionRef.getAndSet(rgHibernate.openSession());
+        Session orgSession = WriteBehind.sessionRef.getAndSet(rgHibernate.openSession());
         if(orgSession != null) {
           orgSession.close();
         }
@@ -111,13 +110,14 @@ public class WriteBehind implements Serializable{
 
         Object[] args = (Object[])r; 
         byte[] value = (byte[]) args[1];
-        hibernateRef.set( new RGHibernate( new String( value)));
+        WriteBehind.hibernateRef.set( new RGHibernate( new String( value)));
         return "OK";
       } finally {
         Thread.currentThread().setContextClassLoader(contextClassLoader);
       }
     })
-    .register(ExecutionMode.SYNC);
+    .collect()
+    .register(ExecutionMode.ASYNC);
   }
   
 }
