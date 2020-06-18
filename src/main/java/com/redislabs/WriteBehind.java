@@ -77,7 +77,7 @@ public class WriteBehind implements Serializable{
     // Register on set schema
     CommandReader readerSchema = new CommandReader().setTrigger("set_schema");
     
-    new GearsBuilder(readerSchema).foreach(r -> {
+    new GearsBuilder(readerSchema).map(r -> {
       Object[] args = (Object[])r; 
       byte[] value = (byte[]) args[1];
       
@@ -94,7 +94,7 @@ public class WriteBehind implements Serializable{
         if(orgSession != null) {
           orgSession.close();
         }
-        
+        return "OK";
       } finally {
         Thread.currentThread().setContextClassLoader(contextClassLoader);
       }
@@ -103,7 +103,7 @@ public class WriteBehind implements Serializable{
     
     // Register on set connection 
     CommandReader readerConnection = new CommandReader().setTrigger("set_connection");
-    new GearsBuilder(readerConnection).foreach(r -> {
+    new GearsBuilder(readerConnection).map(r -> {
       System.setProperty("javax.xml.bind.JAXBContextFactory", "org.eclipse.persistence.jaxb.JAXBContextFactory");
       ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
       try {
@@ -112,11 +112,12 @@ public class WriteBehind implements Serializable{
         Object[] args = (Object[])r; 
         byte[] value = (byte[]) args[1];
         hibernateRef.set( new RGHibernate( new String( value)));
-
+        return "OK";
       } finally {
         Thread.currentThread().setContextClassLoader(contextClassLoader);
       }
-    }).register(ExecutionMode.SYNC);
+    })
+    .register(ExecutionMode.SYNC);
   }
   
 }
