@@ -1,7 +1,6 @@
 package com.redislabs;
 
 import java.io.Serializable;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -13,10 +12,12 @@ import org.hibernate.Transaction;
 
 import gears.ExecutionMode;
 import gears.GearsBuilder;
+import gears.operations.ForeachOperation;
 import gears.records.KeysReaderRecord;
 import gears.readers.CommandReader;
 import gears.readers.KeysReader;
 import gears.readers.StreamReader;
+import gears.readers.StreamReader.FailurePolicy;
 
 public class WriteBehind implements Serializable {
 
@@ -38,20 +39,27 @@ public class WriteBehind implements Serializable {
 
     String orgHashTag = GearsBuilder.hashtag();
 
-    new GearsBuilder<KeysReaderRecord>(reader).foreach(r -> {
-      KeysReaderRecord record = r;
-      Map<String, String> value = record.getHashVal();
-      String key = record.getKey();
-      String[] keySplit = key.split(":");
-
-      Stream<String> commandStream = Stream.of("XADD", "stream", "*", "entityName", keySplit[0], "id", keySplit[1]);
-      Stream<String> fieldsStream = value.entrySet().stream()
-          .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue()));
-
-      String[] command = Stream.concat(commandStream, fieldsStream).toArray(String[]::new);
-
-      GearsBuilder.execute(command); // Write to stream
-
+    GearsBuilder.CreateGearsBuilder(reader)
+    .foreach(new ForeachOperation<KeysReaderRecord>() {
+		
+  		private static final long serialVersionUID = 1L;
+  		
+  		private transient String streamName = String.format("_Stream-{%s}", GearsBuilder.hashtag());
+  
+  		@Override
+  		public void foreach(KeysReaderRecord record) throws Exception {
+  		  Map<String, String> value = record.getHashVal();
+  		  String key = record.getKey();
+  		  String[] keySplit = key.split(":");
+  
+  		  Stream<String> commandStream = Stream.of("XADD", streamName, "*", "entityName", keySplit[0], "id", keySplit[1]);
+  		  Stream<String> fieldsStream = value.entrySet().stream()
+  		      .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue()));
+  
+  		  String[] command = Stream.concat(commandStream, fieldsStream).toArray(String[]::new);
+  
+  		  GearsBuilder.execute(command); // Write to stream			
+  		}
     }).register(ExecutionMode.SYNC, () -> {
       // All shards but the original shard should set the mapping
       if (!GearsBuilder.hashtag().contentEquals(orgHashTag)) {
@@ -66,9 +74,14 @@ public class WriteBehind implements Serializable {
   }
 
   private static void registerOnStream() {
-    StreamReader streamReader = new StreamReader();
+	StreamReader streamReader = new StreamReader()
+			.setPattern(String.format("_Stream-*"))
+			.setBatchSize(100)
+			.setDuration(1000)
+			.setFailurePolicy(FailurePolicy.RETRY)
+			.setFailureRertyInterval(5000);
 
-    new GearsBuilder<HashMap<String, Object>>(streamReader).foreach(r -> {
+    GearsBuilder.CreateGearsBuilder(streamReader).foreach(r -> {
 
       Map<String, byte[]> value = (Map<String, byte[]>) r.get("value");
 
@@ -112,7 +125,7 @@ public class WriteBehind implements Serializable {
     // Register on set schema
     CommandReader readerSchema = new CommandReader().setTrigger("set_schema");
 
-    new GearsBuilder<Object[]>(readerSchema).map(args -> {
+    GearsBuilder.CreateGearsBuilder(readerSchema).map(args -> {
       byte[] value = (byte[]) args[1];
       registerOnChanges(new String(value));
       return "OK";
@@ -120,7 +133,7 @@ public class WriteBehind implements Serializable {
 
     // Register on set connection
     CommandReader readerConnection = new CommandReader().setTrigger("set_connection");
-    new GearsBuilder<Object[]>(readerConnection).map(args -> {
+    GearsBuilder.CreateGearsBuilder(readerConnection).map(args -> {
       System.setProperty("javax.xml.bind.JAXBContextFactory", "org.eclipse.persistence.jaxb.JAXBContextFactory");
       ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
       try {
