@@ -13,6 +13,7 @@ import org.hibernate.Transaction;
 
 import gears.ExecutionMode;
 import gears.GearsBuilder;
+import gears.operations.ForeachOperation;
 import gears.records.KeysReaderRecord;
 import gears.readers.CommandReader;
 import gears.readers.KeysReader;
