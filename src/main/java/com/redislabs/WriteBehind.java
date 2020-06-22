@@ -1,7 +1,6 @@
 package com.redislabs;
 
 import java.io.Serializable;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
