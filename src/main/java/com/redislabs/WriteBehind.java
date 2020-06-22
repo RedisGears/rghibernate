@@ -71,16 +71,7 @@ public class WriteBehind implements Serializable {
       if (orgSession != null) {
         orgSession.close();
       }
-    }, () -> {
-      Session session = sessionRef.get();
-      if(session != null) {
-        session.close();
-      }
-      RGHibernate hibernate = hibernateRef.get();
-      if(hibernate != null) {
-        hibernate.close();
-      }
-    });
+    }, () -> {});
   }
 
   private static void registerOnStream() {
@@ -104,7 +95,19 @@ public class WriteBehind implements Serializable {
       transaction.commit();
       session.clear();
 
-    }).register(ExecutionMode.ASYNC_LOCAL);
+    }).register(ExecutionMode.ASYNC_LOCAL, () -> {
+    }, () -> {
+      Session session = sessionRef.getAndSet(null);
+      if (session != null) {
+        session.close();
+      }
+      RGHibernate hibernate = hibernateRef.getAndSet(null);
+      if (hibernate != null) {
+        hibernate.close();
+      }
+    }
+
+    );
   }
 
   private static String addEntity(String mapping) {
