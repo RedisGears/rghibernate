@@ -17,6 +17,7 @@ import gears.records.KeysReaderRecord;
 import gears.readers.CommandReader;
 import gears.readers.KeysReader;
 import gears.readers.StreamReader;
+import gears.readers.StreamReader.FailurePolicy;
 
 public class WriteBehind implements Serializable {
 
@@ -91,7 +92,7 @@ public class WriteBehind implements Serializable {
       transaction.commit();
       session.clear();
 
-    }).register();
+    }).register(ExecutionMode.ASYNC_LOCAL);
   }
 
   private static String addEntity(String mapping) {
