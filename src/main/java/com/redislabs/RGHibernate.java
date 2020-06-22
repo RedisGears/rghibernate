@@ -1,5 +1,8 @@
 package com.redislabs;
 
+import java.io.Closeable;
+import java.io.IOException;
+
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.Metadata;
@@ -7,7 +10,7 @@ import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 
-public class RGHibernate {
+public class RGHibernate implements Closeable {
 
   private final MetadataSources sources;
   private SessionFactory sessionFactory;
@@ -28,6 +31,11 @@ public class RGHibernate {
 
   public Session openSession() {
     return sessionFactory.openSession();
+  }
+
+  @Override
+  public void close() throws IOException {
+    sessionFactory.close();
   }
 }
 

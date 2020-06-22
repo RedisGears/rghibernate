@@ -1,6 +1,7 @@
 package com.redislabs;
 
 import java.io.Serializable;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -17,11 +18,11 @@ import gears.readers.CommandReader;
 import gears.readers.KeysReader;
 import gears.readers.StreamReader;
 
-public class WriteBehind implements Serializable{
+public class WriteBehind implements Serializable {
 
   private static final long serialVersionUID = 1L;
-  
-  private static final AtomicReference<Session> sessionRef       = new AtomicReference<>();
+
+  private static final AtomicReference<Session> sessionRef = new AtomicReference<>();
   private static final AtomicReference<RGHibernate> hibernateRef = new AtomicReference<>();
 
   public static void main() {
@@ -30,38 +31,46 @@ public class WriteBehind implements Serializable{
   }
 
   private static void registerOnChanges(String mapping) {
-    
+
     String entity = addEntity(mapping);
-    KeysReader reader = new KeysReader(entity + ":*")
-        .setEventTypes(new String[] { "hset" })
-        .setReadValues(true)
+    KeysReader reader = new KeysReader(entity + ":*").setEventTypes(new String[] { "hset" }).setReadValues(true)
         .setNoScan(false);
-    
+
     String orgHashTag = GearsBuilder.hashtag();
 
-    new GearsBuilder(reader).foreach(r -> {
-      KeysReaderRecord record = (KeysReaderRecord)r; 
+    new GearsBuilder<KeysReaderRecord>(reader)
+    .foreach(r -> {
+      KeysReaderRecord record = r;
       Map<String, String> value = record.getHashVal();
       String key = record.getKey();
       String[] keySplit = key.split(":");
-      
-      Stream<String> commandStream = Stream.of("XADD", "stream", "*", "entityName", keySplit[0],  "id", keySplit[1]);
+
+      Stream<String> commandStream = Stream.of("XADD", "stream", "*", "entityName", keySplit[0], "id", keySplit[1]);
       Stream<String> fieldsStream = value.entrySet().stream()
-          .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue())); 
-      
+          .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue()));
+
       String[] command = Stream.concat(commandStream, fieldsStream).toArray(String[]::new);
-      
-      GearsBuilder.execute(command); // Write to stream 
-      
+
+      GearsBuilder.execute(command); // Write to stream
+
     }).register(ExecutionMode.SYNC, () -> {
       // All shards but the original shard should set the mapping
-      if(!GearsBuilder.hashtag().contentEquals( orgHashTag)) {
+      if (!GearsBuilder.hashtag().contentEquals(orgHashTag)) {
         addEntity(mapping);
       }
       // Init the session here so it will happen on each shard
       Session orgSession = WriteBehind.sessionRef.getAndSet(WriteBehind.hibernateRef.get().openSession());
-      if(orgSession != null) {
+      if (orgSession != null) {
         orgSession.close();
+      }
+    }, () -> {
+      Session session = sessionRef.get();
+      if(session != null) {
+        session.close();
+      }
+      RGHibernate hibernate = hibernateRef.get();
+      if(hibernate != null) {
+        hibernate.close();
       }
     });
   }
@@ -69,9 +78,9 @@ public class WriteBehind implements Serializable{
   private static void registerOnStream() {
     StreamReader streamReader = new StreamReader();
 
-    new GearsBuilder(streamReader).foreach(r -> {
-     
-      Map<String, byte[]> value = (Map<String, byte[]>) ((Map) r).get("value");
+    new GearsBuilder<HashMap<String, Object>>(streamReader).foreach(r -> {
+
+      Map<String, byte[]> value = (Map<String, byte[]>) r.get("value");
 
       Map<String, String> map = value.entrySet().stream()
           .collect(Collectors.toMap(Map.Entry::getKey, e -> new String(e.getValue())));
@@ -84,52 +93,44 @@ public class WriteBehind implements Serializable{
 
     }).register();
   }
-  
+
   private static String addEntity(String mapping) {
     ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
     try {
       Thread.currentThread().setContextClassLoader(WriteBehind.class.getClassLoader());
       RGHibernate rgHibernate = WriteBehind.hibernateRef.get();
       return rgHibernate.addMapping(mapping);
-      
+
     } finally {
       Thread.currentThread().setContextClassLoader(contextClassLoader);
     }
   }
-  
+
   private static void registerOnCommands() {
     // Register on set schema
     CommandReader readerSchema = new CommandReader().setTrigger("set_schema");
-    
-    new GearsBuilder(readerSchema).map(r -> {
-      Object[] args = (Object[])r; 
-      byte[] value = (byte[]) args[1];
-      
 
+    new GearsBuilder<Object[]>(readerSchema).map(args -> {
+      byte[] value = (byte[]) args[1];
       registerOnChanges(new String(value));
-      
       return "OK";
     }).register(ExecutionMode.SYNC);
-    
-    
-    // Register on set connection 
+
+    // Register on set connection
     CommandReader readerConnection = new CommandReader().setTrigger("set_connection");
-    new GearsBuilder(readerConnection).map(r -> {
+    new GearsBuilder<Object[]>(readerConnection).map(args -> {
       System.setProperty("javax.xml.bind.JAXBContextFactory", "org.eclipse.persistence.jaxb.JAXBContextFactory");
       ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
       try {
         Thread.currentThread().setContextClassLoader(WriteBehind.class.getClassLoader());
 
-        Object[] args = (Object[])r; 
         byte[] value = (byte[]) args[1];
-        WriteBehind.hibernateRef.set( new RGHibernate( new String( value)));
+        WriteBehind.hibernateRef.set(new RGHibernate(new String(value)));
         return "OK";
       } finally {
         Thread.currentThread().setContextClassLoader(contextClassLoader);
       }
-    })
-    .collect()
-    .register(ExecutionMode.ASYNC);
+    }).collect().register(ExecutionMode.ASYNC);
   }
-  
+
 }
