@@ -43,24 +43,24 @@ public class WriteBehind implements Serializable {
     GearsBuilder.CreateGearsBuilder(reader)
     .foreach(new ForeachOperation<KeysReaderRecord>() {
 		
-		private static final long serialVersionUID = 1L;
-		
-		private transient String streamName = String.format("_Stream-{%s}", GearsBuilder.hashtag());
-
-		@Override
-		public void foreach(KeysReaderRecord record) throws Exception {
-	      Map<String, String> value = record.getHashVal();
-	      String key = record.getKey();
-	      String[] keySplit = key.split(":");
-
-	      Stream<String> commandStream = Stream.of("XADD", streamName, "*", "entityName", keySplit[0], "id", keySplit[1]);
-	      Stream<String> fieldsStream = value.entrySet().stream()
-	          .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue()));
-
-	      String[] command = Stream.concat(commandStream, fieldsStream).toArray(String[]::new);
-
-	      GearsBuilder.execute(command); // Write to stream			
-		}
+  		private static final long serialVersionUID = 1L;
+  		
+  		private transient String streamName = String.format("_Stream-{%s}", GearsBuilder.hashtag());
+  
+  		@Override
+  		public void foreach(KeysReaderRecord record) throws Exception {
+  		  Map<String, String> value = record.getHashVal();
+  		  String key = record.getKey();
+  		  String[] keySplit = key.split(":");
+  
+  		  Stream<String> commandStream = Stream.of("XADD", streamName, "*", "entityName", keySplit[0], "id", keySplit[1]);
+  		  Stream<String> fieldsStream = value.entrySet().stream()
+  		      .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue()));
+  
+  		  String[] command = Stream.concat(commandStream, fieldsStream).toArray(String[]::new);
+  
+  		  GearsBuilder.execute(command); // Write to stream			
+  		}
     }).register(ExecutionMode.SYNC, () -> {
       // All shards but the original shard should set the mapping
       if (!GearsBuilder.hashtag().contentEquals(orgHashTag)) {
