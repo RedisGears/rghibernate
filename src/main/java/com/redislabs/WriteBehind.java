@@ -43,10 +43,9 @@ public class WriteBehind implements Serializable {
     GearsBuilder.CreateGearsBuilder(reader)
     .foreach(new ForeachOperation<KeysReaderRecord>() {
 		
-		/**
-		 * 
-		 */
 		private static final long serialVersionUID = 1L;
+		
+		private transient String streamName = String.format("_Stream-{%s}", GearsBuilder.hashtag());
 
 		@Override
 		public void foreach(KeysReaderRecord record) throws Exception {
@@ -54,7 +53,7 @@ public class WriteBehind implements Serializable {
 	      String key = record.getKey();
 	      String[] keySplit = key.split(":");
 
-	      Stream<String> commandStream = Stream.of("XADD", "stream", "*", "entityName", keySplit[0], "id", keySplit[1]);
+	      Stream<String> commandStream = Stream.of("XADD", streamName, "*", "entityName", keySplit[0], "id", keySplit[1]);
 	      Stream<String> fieldsStream = value.entrySet().stream()
 	          .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue()));
 
