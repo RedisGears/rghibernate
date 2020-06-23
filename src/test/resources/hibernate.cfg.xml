@@ -6,7 +6,7 @@
 	<session-factory>
 		<!-- JDBC Database connection settings -->
 		<property name="connection.driver_class">org.mariadb.jdbc.Driver</property>
-		<property name="connection.url">jdbc:mysql://localhost:3306/hibernate_db?allowPublicKeyRetrieval=true&amp;useSSL=false</property>
+		<property name="connection.url">jdbc:mysql://localhost:3306/hibernate_db?allowPublicKeyRetrieval=true&amp;useSSL=false&amp;characterEncoding=utf8</property>
 		<property name="connection.username">root</property>
 		<property name="connection.password">my-secret-pw</property>
 		<!-- JDBC connection pool settings ... using built-in test pool -->
