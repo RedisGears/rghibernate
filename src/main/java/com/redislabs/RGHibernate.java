@@ -13,7 +13,7 @@ import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 public class RGHibernate implements Closeable {
 
   private final MetadataSources sources;
-  private SessionFactory sessionFactory;
+  private volatile SessionFactory sessionFactory;
 
   public RGHibernate(String configuration) {
       StandardServiceRegistry registry = new StandardServiceRegistryBuilder()
