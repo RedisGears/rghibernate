@@ -27,10 +27,7 @@ public class RGHibernate implements Closeable {
     sources.addURL(InMemoryURLFactory.getInstance().build("mapping", mapping));    
     Metadata metadata = sources.getMetadataBuilder().build();
     
-    SessionFactory currentSessionFactory = sessionFactory;
-    sessionFactory = metadata.getSessionFactoryBuilder().build();
-    currentSessionFactory.close(); //close previous factory
-    
+    sessionFactory = metadata.getSessionFactoryBuilder().build(); // rebuild factory 
     return metadata.getEntityBindings().iterator().next().getEntityName();
   }
 
