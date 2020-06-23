@@ -15,6 +15,7 @@ jobs:
           MYSQL_DATABASE: hibernate_db
           MYSQL_USER: user
           MYSQL_PASSWORD: passw0rd
+          MYSQL_ROOT_HOST: %
       
     working_directory: ~/repo
 
