@@ -96,6 +96,7 @@ public class WriteBehind implements Serializable {
 
     }).register(ExecutionMode.ASYNC_LOCAL, () -> {
     }, () -> {
+      // Close and clean all references to Hibernate seesions
       Session session = sessionRef.getAndSet(null);
       if (session != null) {
         session.close();
