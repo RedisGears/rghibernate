@@ -13,7 +13,7 @@ import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 public class RGHibernate implements Closeable {
 
   private final MetadataSources sources;
-  private SessionFactory sessionFactory;
+  private volatile SessionFactory sessionFactory;
 
   public RGHibernate(String configuration) {
       StandardServiceRegistry registry = new StandardServiceRegistryBuilder()
@@ -23,9 +23,11 @@ public class RGHibernate implements Closeable {
   }
 
   public String addMapping(String mapping) {
+    
     sources.addURL(InMemoryURLFactory.getInstance().build("mapping", mapping));    
     Metadata metadata = sources.getMetadataBuilder().build();
-    sessionFactory = metadata.getSessionFactoryBuilder().build();
+    
+    sessionFactory = metadata.getSessionFactoryBuilder().build(); // rebuild factory 
     return metadata.getEntityBindings().iterator().next().getEntityName();
   }
 
