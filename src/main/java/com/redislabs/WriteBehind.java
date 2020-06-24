@@ -45,6 +45,11 @@ public class WriteBehind implements Serializable {
   		private static final long serialVersionUID = 1L;
   		
   		private transient String streamName = String.format("_Stream-{%s}", GearsBuilder.hashtag());
+  		
+  		protected Object readResolve() {
+  		  this.streamName = String.format("_Stream-{%s}", GearsBuilder.hashtag());
+  		  return this;
+  		}
   
   		@Override
   		public void foreach(KeysReaderRecord record) throws Exception {
@@ -58,7 +63,7 @@ public class WriteBehind implements Serializable {
   
   		  String[] command = Stream.concat(commandStream, fieldsStream).toArray(String[]::new);
   
-  		  GearsBuilder.execute(command); // Write to stream			
+  		  GearsBuilder.execute(command); // Write to stream
   		}
     }).register(ExecutionMode.SYNC, () -> {
       // All shards but the original shard should set the mapping
@@ -96,6 +101,7 @@ public class WriteBehind implements Serializable {
 
     }).register(ExecutionMode.ASYNC_LOCAL, () -> {
     }, () -> {
+      // Close and clean all references to Hibernate seesions
       Session session = sessionRef.getAndSet(null);
       if (session != null) {
         session.close();

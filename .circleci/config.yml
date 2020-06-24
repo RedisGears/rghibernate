@@ -9,12 +9,10 @@ jobs:
       - image: circleci/openjdk:11.0.7-jdk-buster
       
       - image: circleci/mysql:8.0.4
-        port: 3306:3306
-        environment:
-          MYSQL_ROOT_PASSWORD: my-secret-pw
-          MYSQL_DATABASE: hibernate_db
-          MYSQL_USER: user
-          MYSQL_PASSWORD: passw0rd
+        env:
+          - MYSQL_ROOT_PASSWORD=my-secret-pw
+          - MYSQL_DATABASE=hibernate_db
+          - MYSQL_ROOT_HOST=%
       
     working_directory: ~/repo
 
@@ -42,7 +40,7 @@ jobs:
         
       # run tests!
       - run: mvn pmd:check
-      - run: mvn integration-test 
+      - run: mvn integration-test -DreuseForks=true -DchildDelegation=true
       - run: mvn cobertura:cobertura          
       - run: bash <(curl -s https://codecov.io/bash) -t ${CODECOV_TOKEN}  
               
