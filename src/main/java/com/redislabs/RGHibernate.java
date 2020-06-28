@@ -2,6 +2,7 @@ package com.redislabs;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.Serializable;
 
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
@@ -10,34 +11,37 @@ import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 
-public class RGHibernate implements Closeable {
+public class RGHibernate implements Closeable, Serializable {
 
-  private final MetadataSources sources;
-  private volatile SessionFactory sessionFactory;
+  private static final long serialVersionUID = 1L;
 
-  public RGHibernate(String configuration) {
-      StandardServiceRegistry registry = new StandardServiceRegistryBuilder()
-          .configure( InMemoryURLFactory.getInstance().build("configuration", configuration))
-          .build();
-      sources = new MetadataSources(registry);
+  private String[] args;
+  private transient Session session = null;
+
+  public RGHibernate(String[] args) {
+    this.args = args;
   }
-
-  public String addMapping(String mapping) {
-    
-    sources.addURL(InMemoryURLFactory.getInstance().build("mapping", mapping));    
+  
+  public void generateSession() {
+    StandardServiceRegistry registry = new StandardServiceRegistryBuilder()
+        .configure( InMemoryURLFactory.getInstance().build("configuration", args[0]))
+        .build();
+    MetadataSources sources = new MetadataSources(registry);
+    for(int i = 1 ; i < args.length ; ++i) {
+      sources.addURL(InMemoryURLFactory.getInstance().build("mapping", args[i]));
+    }
     Metadata metadata = sources.getMetadataBuilder().build();
     
-    sessionFactory = metadata.getSessionFactoryBuilder().build(); // rebuild factory 
-    return metadata.getEntityBindings().iterator().next().getEntityName();
+    session = metadata.getSessionFactoryBuilder().build().openSession(); 
   }
 
-  public Session openSession() {
-    return sessionFactory.openSession();
+  public Session getSession() {
+    return session;
   }
 
   @Override
   public void close() throws IOException {
-    sessionFactory.close();
+    session.close();
   }
 }
 
