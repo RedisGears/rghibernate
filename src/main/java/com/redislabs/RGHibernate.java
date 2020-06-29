@@ -3,13 +3,21 @@ package com.redislabs;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.Serializable;
+import java.sql.Driver;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.Enumeration;
+import java.util.Iterator;
 
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.Metadata;
 import org.hibernate.boot.MetadataSources;
+import org.hibernate.boot.SessionFactoryBuilder;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
+
+import gears.GearsBuilder;
 
 public class RGHibernate implements Closeable, Serializable {
 
@@ -17,13 +25,15 @@ public class RGHibernate implements Closeable, Serializable {
 
   private String[] args;
   private transient Session session = null;
-
+  private transient SessionFactory factory = null;
+  private transient StandardServiceRegistry registry = null;
+  
   public RGHibernate(String[] args) {
     this.args = args;
   }
   
   public void generateSession() {
-    StandardServiceRegistry registry = new StandardServiceRegistryBuilder()
+    registry = new StandardServiceRegistryBuilder()
         .configure( InMemoryURLFactory.getInstance().build("configuration", args[0]))
         .build();
     MetadataSources sources = new MetadataSources(registry);
@@ -32,7 +42,8 @@ public class RGHibernate implements Closeable, Serializable {
     }
     Metadata metadata = sources.getMetadataBuilder().build();
     
-    session = metadata.getSessionFactoryBuilder().build().openSession(); 
+    factory = metadata.getSessionFactoryBuilder().build();
+    session = factory.openSession(); 
   }
 
   public Session getSession() {
@@ -42,6 +53,21 @@ public class RGHibernate implements Closeable, Serializable {
   @Override
   public void close() throws IOException {
     session.close();
+    factory.close();
+    
+    try {
+      Enumeration<Driver> de = DriverManager.getDrivers();
+      while(de.hasMoreElements()) {
+        Driver d = de.nextElement();
+        if(d.getClass().getClassLoader() == RGHibernate.class.getClassLoader()) {
+          DriverManager.deregisterDriver(d);
+        }
+        
+      }
+    } catch (SQLException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
   }
 }
 

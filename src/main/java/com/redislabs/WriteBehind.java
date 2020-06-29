@@ -1,9 +1,11 @@
 package com.redislabs;
 
 import java.io.Serializable;
+import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import java.util.stream.Stream;
@@ -14,6 +16,7 @@ import org.hibernate.boot.Metadata;
 import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
+import org.mariadb.jdbc.Driver;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -135,6 +138,10 @@ public class WriteBehind implements Serializable {
         GearsBuilder.log(e.toString(), LogLevel.WARNING);
         continue;
       }
+      
+      // we need this to make sure we are not leaking
+      objectMapper.getTypeFactory().clearCache();
+      
       if(metaData.compareTo(md) <= 0) {
         String msg = String.format("Found newer write behind version, curr_version='%s', found_versoin='%s'", metaData, md);
         GearsBuilder.log(msg, LogLevel.WARNING);
@@ -169,6 +176,10 @@ public class WriteBehind implements Serializable {
     ObjectMapper objectMapper = new ObjectMapper();
     String registrationsDesc = objectMapper.writeValueAsString(metaData);
     
+    // we need this to make sure we are not leaking
+    objectMapper.getTypeFactory().clearCache();
+    
+    
     unregisterOldVersions(metaData);
     
     GearsBuilder.log(String.format("Register %s", registrationsDesc));
@@ -178,15 +189,18 @@ public class WriteBehind implements Serializable {
     StandardServiceRegistry tempRegistry = new StandardServiceRegistryBuilder()
         .configure( InMemoryURLFactory.getInstance().build("configuration", connectionXml))
         .build();
-    MetadataSources tempSources = new MetadataSources(tempRegistry);
+    
+    String uuid = UUID.randomUUID().toString();
     
     // Created Keys Readers
     
     for(int i = 1 ; i < args.length ; ++i) {
+      MetadataSources tempSources = new MetadataSources(tempRegistry);
       tempSources.addURL(InMemoryURLFactory.getInstance().build("mapping", args[i]));
       Metadata metadata = tempSources.getMetadataBuilder().build(); 
       String enteryName = metadata.getEntityBindings().iterator().next().getEntityName();
       
+     
       KeysReader reader = new KeysReader().
           setPattern(enteryName + ":*").
           setEventTypes(new String[] {"hset", "hmset"});
@@ -196,10 +210,10 @@ public class WriteBehind implements Serializable {
         
         private static final long serialVersionUID = 1L;
 
-        private transient String streamName = String.format("_Stream-{%s}", GearsBuilder.hashtag());
+        private transient String streamName = String.format("_Stream-%s-{%s}", uuid, GearsBuilder.hashtag());
         
         protected Object readResolve() {
-          this.streamName = String.format("_Stream-{%s}", GearsBuilder.hashtag());
+          this.streamName = String.format("_Stream-%s-{%s}", uuid, GearsBuilder.hashtag());
           return this;
         }
         
@@ -223,13 +237,15 @@ public class WriteBehind implements Serializable {
       }, ()->{});
     }
     
+    tempRegistry.close();
+    
     
     // Created Stream Reader
     
     RGHibernate rghibernate = new RGHibernate(args);
     
     StreamReader streamReader = new StreamReader()
-        .setPattern(String.format("_Stream-*"))
+        .setPattern(String.format("_Stream-%s-*", uuid))
         .setBatchSize(100)
         .setDuration(1000)
         .setFailurePolicy(FailurePolicy.RETRY)
