@@ -16,6 +16,7 @@ import org.hibernate.boot.Metadata;
 import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
+import org.hibernate.mapping.PersistentClass;
 import org.mariadb.jdbc.Driver;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -197,13 +198,15 @@ public class WriteBehind implements Serializable {
     for(int i = 1 ; i < args.length ; ++i) {
       MetadataSources tempSources = new MetadataSources(tempRegistry);
       tempSources.addURL(InMemoryURLFactory.getInstance().build("mapping", args[i]));
-      Metadata metadata = tempSources.getMetadataBuilder().build(); 
-      String enteryName = metadata.getEntityBindings().iterator().next().getEntityName();
+      Metadata metadata = tempSources.getMetadataBuilder().build();
+      PersistentClass pc = metadata.getEntityBindings().iterator().next();
+      String enteryName = pc.getEntityName();
+      String idName = pc.getIdentifierProperty().getName();
       
      
       KeysReader reader = new KeysReader().
           setPattern(enteryName + ":*").
-          setEventTypes(new String[] {"hset", "hmset"});
+          setEventTypes(new String[] {"hset", "hmset", "del"});
           
       GearsBuilder.CreateGearsBuilder(reader, registrationsDesc).
       foreach(new ForeachOperation<KeysReaderRecord>() {
@@ -223,11 +226,16 @@ public class WriteBehind implements Serializable {
           String key = record.getKey();
           String[] keySplit = key.split(":");
     
-          Stream<String> commandStream = Stream.of("XADD", streamName, "*", "entityName", keySplit[0], "id", keySplit[1]);
-          Stream<String> fieldsStream = value.entrySet().stream()
-              .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue()));
-    
-          String[] command = Stream.concat(commandStream, fieldsStream).toArray(String[]::new);
+          String[] command;
+          Stream<String> commandStream = Stream.of("XADD", streamName, "*", "entityName", keySplit[0], idName, keySplit[1], "event", record.getEvent());
+          if(record.getEvent().charAt(0) != 'd') {
+            Stream<String> fieldsStream = value.entrySet().stream()
+                .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue()));
+      
+            command = Stream.concat(commandStream, fieldsStream).toArray(String[]::new);
+          }else {
+            command = commandStream.toArray(String[]::new);
+          }
     
           GearsBuilder.execute(command); // Write to stream    
         }
@@ -258,10 +266,14 @@ public class WriteBehind implements Serializable {
         Map<String, String> map = value.entrySet().stream()
             .collect(Collectors.toMap(Map.Entry::getKey, e -> new String(e.getValue())));
 
-        GearsBuilder.log(rghibernate.toString());
         Session session = rghibernate.getSession();
         Transaction transaction = session.beginTransaction();
-        session.saveOrUpdate(map.remove("entityName"), map);
+        String event = map.remove("event");
+        if(event.charAt(0) != 'd') {
+          session.saveOrUpdate(map.remove("entityName"), map);
+        }else {
+          session.delete(map.remove("entityName"), map);
+        }
         transaction.commit();
         session.clear();
 
