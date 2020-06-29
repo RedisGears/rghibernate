@@ -3,6 +3,7 @@ package com.redislabs;
 import java.io.Serializable;
 import java.sql.DriverManager;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -24,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import gears.ExecutionMode;
 import gears.GearsBuilder;
 import gears.LogLevel;
+import gears.operations.AccumulateOperation;
 import gears.operations.ForeachOperation;
 import gears.records.KeysReaderRecord;
 import gears.readers.KeysReader;
@@ -259,25 +261,61 @@ public class WriteBehind implements Serializable {
         .setFailurePolicy(FailurePolicy.RETRY)
         .setFailureRertyInterval(5000);
 
-    GearsBuilder.CreateGearsBuilder(streamReader, registrationsDesc).foreach(r -> {
+    GearsBuilder.CreateGearsBuilder(streamReader, registrationsDesc).
+    accumulate(new AccumulateOperation<HashMap<String,Object>, ArrayList<HashMap<String, Object>>>() {
 
+      
+      private static final long serialVersionUID = 1L;
+
+      @Override
+      public ArrayList<HashMap<String, Object>> accumulate(ArrayList<HashMap<String, Object>> a,
+          HashMap<String, Object> r) throws Exception {
+        
+        if(a == null) {
+          a = new ArrayList<HashMap<String, Object>>();
+        }
+        a.add(r);
+        return a;
+      }
+      
+    }).
+    foreach(records -> {
+      
+      Session session = rghibernate.getSession();
+      Transaction transaction = session.beginTransaction();
+      boolean isMerge = true;
+      
+      for(Map<String, Object> r: records) {
         Map<String, byte[]> value = (Map<String, byte[]>) r.get("value");
 
         Map<String, String> map = value.entrySet().stream()
             .collect(Collectors.toMap(Map.Entry::getKey, e -> new String(e.getValue())));
-
-        Session session = rghibernate.getSession();
-        Transaction transaction = session.beginTransaction();
+        
         String event = map.remove("event");
         if(event.charAt(0) != 'd') {
-          session.saveOrUpdate(map.remove("entityName"), map);
+          if(!isMerge) {
+            transaction.commit();
+            session.clear();
+            transaction = session.beginTransaction();
+            isMerge = true;
+          }
+          session.merge(map.remove("entityName"), map);
         }else {
+          if(isMerge) {
+            transaction.commit();
+            session.clear();
+            transaction = session.beginTransaction();
+            isMerge = false;
+          }
           session.delete(map.remove("entityName"), map);
         }
-        transaction.commit();
-        session.clear();
-
-    }).register(ExecutionMode.ASYNC_LOCAL, () -> {
+      }
+      
+      transaction.commit();
+      session.clear();
+    }).
+    map(r->r.size()).
+    register(ExecutionMode.ASYNC_LOCAL, () -> {
       System.setProperty("javax.xml.bind.JAXBContextFactory", "org.eclipse.persistence.jaxb.JAXBContextFactory");
       Thread.currentThread().setContextClassLoader(WriteBehind.class.getClassLoader());
       rghibernate.generateSession();
