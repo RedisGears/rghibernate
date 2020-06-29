@@ -37,6 +37,7 @@ public class RGHibernateTest {
       item1.put( "email", "ron.don@tau.ac.il" );
       session.saveOrUpdate("Student", item1);
       transaction.commit();
+      session.clear();
       
       Transaction transaction2 = session.beginTransaction();
       Map item2 = new HashMap();
@@ -46,6 +47,7 @@ public class RGHibernateTest {
       item2.put( "email", "danni.din@tau.ac.il" );
       session.saveOrUpdate("Student", item2);
       transaction2.commit();
+      session.clear();
       
       Transaction transaction3 = session.beginTransaction();
       Map item3 = new HashMap();
@@ -55,6 +57,7 @@ public class RGHibernateTest {
       item3.put( "email", "john.scott@tau.ac.il");
       session.saveOrUpdate("Professor", item3);
       transaction3.commit();
+      session.clear();
       
       Transaction transaction4 = session.beginTransaction();
       Map item4 = new HashMap();
@@ -64,6 +67,7 @@ public class RGHibernateTest {
       item4.put( "email", "danni.chin@tau.ac.il");
       session.saveOrUpdate("Student", item4);
       transaction4.commit();
+      session.clear();
     } 
     
     rgHibernate.close();
