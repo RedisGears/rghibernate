@@ -9,10 +9,11 @@ jobs:
       - image: circleci/openjdk:11.0.7-jdk-buster
       
       - image: circleci/mysql:8.0.4
-        env:
-          - MYSQL_ROOT_PASSWORD=my-secret-pw
-          - MYSQL_DATABASE=hibernate_db
-          - MYSQL_ROOT_HOST=%
+        environment:
+          MYSQL_ROOT_PASSWORD : my-secret-pw
+          MYSQL_DATABASE : hibernate_db
+          MYSQL_USER: user
+          MYSQL_PASSWORD: passw0rd
       
     working_directory: ~/repo
 
