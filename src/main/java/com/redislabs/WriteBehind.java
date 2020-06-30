@@ -215,10 +215,10 @@ public class WriteBehind implements Serializable {
         
         private static final long serialVersionUID = 1L;
 
-        private transient String streamName = String.format("_Stream-%s-{%s}", uuid, GearsBuilder.hashtag());
+        private transient String streamName = String.format("_Stream-%s", uuid);
         
         protected Object readResolve() {
-          this.streamName = String.format("_Stream-%s-{%s}", uuid, GearsBuilder.hashtag());
+          this.streamName = String.format("_Stream-%s", uuid);
           return this;
         }
         
@@ -229,7 +229,7 @@ public class WriteBehind implements Serializable {
           String[] keySplit = key.split(":");
     
           String[] command;
-          Stream<String> commandStream = Stream.of("XADD", streamName, "*", "entityName", keySplit[0], idName, keySplit[1], "event", record.getEvent());
+          Stream<String> commandStream = Stream.of("XADD", String.format("%s-{%s}", streamName, GearsBuilder.hashtag()), "*", "entityName", keySplit[0], idName, keySplit[1], "event", record.getEvent());
           if(record.getEvent().charAt(0) != 'd') {
             Stream<String> fieldsStream = value.entrySet().stream()
                 .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue()));
@@ -259,7 +259,7 @@ public class WriteBehind implements Serializable {
         .setBatchSize(100)
         .setDuration(1000)
         .setFailurePolicy(FailurePolicy.RETRY)
-        .setFailureRertyInterval(5000);
+        .setFailureRertyInterval(5);
 
     GearsBuilder.CreateGearsBuilder(streamReader, registrationsDesc).
     accumulate(new AccumulateOperation<HashMap<String,Object>, ArrayList<HashMap<String, Object>>>() {
@@ -281,38 +281,43 @@ public class WriteBehind implements Serializable {
     }).
     foreach(records -> {
       
-      Session session = rghibernate.getSession();
-      Transaction transaction = session.beginTransaction();
-      boolean isMerge = true;
-      
-      for(Map<String, Object> r: records) {
-        Map<String, byte[]> value = (Map<String, byte[]>) r.get("value");
-
-        Map<String, String> map = value.entrySet().stream()
-            .collect(Collectors.toMap(Map.Entry::getKey, e -> new String(e.getValue())));
+      try {
+        Session session = rghibernate.getSession();
+        Transaction transaction = session.beginTransaction();
+        boolean isMerge = true;
         
-        String event = map.remove("event");
-        if(event.charAt(0) != 'd') {
-          if(!isMerge) {
-            transaction.commit();
-            session.clear();
-            transaction = session.beginTransaction();
-            isMerge = true;
+        for(Map<String, Object> r: records) {
+          Map<String, byte[]> value = (Map<String, byte[]>) r.get("value");
+  
+          Map<String, String> map = value.entrySet().stream()
+              .collect(Collectors.toMap(Map.Entry::getKey, e -> new String(e.getValue())));
+          
+          String event = map.remove("event");
+          if(event.charAt(0) != 'd') {
+            if(!isMerge) {
+              transaction.commit();
+              session.clear();
+              transaction = session.beginTransaction();
+              isMerge = true;
+            }
+            session.merge(map.remove("entityName"), map);
+          }else {
+            if(isMerge) {
+              transaction.commit();
+              session.clear();
+              transaction = session.beginTransaction();
+              isMerge = false;
+            }
+            session.delete(map.remove("entityName"), map);
           }
-          session.merge(map.remove("entityName"), map);
-        }else {
-          if(isMerge) {
-            transaction.commit();
-            session.clear();
-            transaction = session.beginTransaction();
-            isMerge = false;
-          }
-          session.delete(map.remove("entityName"), map);
         }
+        
+        transaction.commit();
+        session.clear();
+      }catch (Exception e) {
+        rghibernate.recreateSession();
+        throw e;
       }
-      
-      transaction.commit();
-      session.clear();
     }).
     map(r->r.size()).
     register(ExecutionMode.ASYNC_LOCAL, () -> {

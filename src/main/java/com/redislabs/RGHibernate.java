@@ -49,6 +49,12 @@ public class RGHibernate implements Closeable, Serializable {
   public Session getSession() {
     return session;
   }
+  
+  public void recreateSession() {
+    session.clear();
+    session.close();
+    session = factory.openSession();
+  }
 
   @Override
   public void close() throws IOException {
