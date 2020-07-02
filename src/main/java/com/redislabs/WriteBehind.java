@@ -41,12 +41,21 @@ public class WriteBehind implements Serializable {
     
     String name = "JWriteBehind";
     String desc = "Write behind java implementation";
+    String uuid = null;
     int majorV = 99;
     int minorV = 99;
     int patchV = 99;
     
     public MetaData() {
       
+    }
+    
+    public String getUuid() {
+      return uuid;
+    }
+
+    public void setUuid(String uuid) {
+      this.uuid = uuid;
     }
     
     public String getName() {
@@ -125,8 +134,9 @@ public class WriteBehind implements Serializable {
     }
   }
   
-  private static void unregisterOldVersions(MetaData metaData) throws Exception {
+  private static String unregisterOldVersions(MetaData metaData) throws Exception {
     GearsBuilder.log("Unregister old versions");
+    String uuid = null;
     List<String> idsToUnregister = new ArrayList<>();
     Object[] registrations = (Object[])GearsBuilder.execute("RG.DUMPREGISTRATIONS");
     for(Object o : registrations) {
@@ -150,6 +160,7 @@ public class WriteBehind implements Serializable {
         GearsBuilder.log(msg, LogLevel.WARNING);
         throw new Exception(msg);
       }
+      uuid = md.getUuid();
       idsToUnregister.add(id);
     }
     
@@ -164,26 +175,32 @@ public class WriteBehind implements Serializable {
     }
     
     GearsBuilder.log("Done unregistered old versions");
+    
+    if(uuid == null) {
+      uuid = UUID.randomUUID().toString();
+    }
+    
+    return uuid;
   }
   
   public static void main(String[] args) throws Exception {
     System.setProperty("javax.xml.bind.JAXBContextFactory", "org.eclipse.persistence.jaxb.JAXBContextFactory");
     Thread.currentThread().setContextClassLoader(WriteBehind.class.getClassLoader());
     
-    MetaData metaData = new MetaData();
-    
     if(args.length < 2) {
       throw new Exception("Not enough arguments given");
     }
     
+    MetaData metaData = new MetaData();
+    
+    String uuid = unregisterOldVersions(metaData);
+
+    metaData.setUuid(uuid);
+    
     ObjectMapper objectMapper = new ObjectMapper();
     String registrationsDesc = objectMapper.writeValueAsString(metaData);
-    
     // we need this to make sure we are not leaking
     objectMapper.getTypeFactory().clearCache();
-    
-    
-    unregisterOldVersions(metaData);
     
     GearsBuilder.log(String.format("Register %s", registrationsDesc));
     
@@ -192,8 +209,6 @@ public class WriteBehind implements Serializable {
     StandardServiceRegistry tempRegistry = new StandardServiceRegistryBuilder()
         .configure( InMemoryURLFactory.getInstance().build("configuration", connectionXml))
         .build();
-    
-    String uuid = UUID.randomUUID().toString();
     
     // Created Keys Readers
     
