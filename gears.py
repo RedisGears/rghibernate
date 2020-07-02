@@ -1,7 +1,7 @@
 import time
 import redis
 
-#conn = redis.Redis('redis-14065.test18880736.cto.redislabs.com', 14065, password='Password123')
+#conn = redis.Redis('redis-15746.test6e600eec.cto.redislabs.com', 15746, password='Password123')
 conn = redis.Redis()
 
 with open('./target/rghibernate-0.0.3-SNAPSHOT-jar-with-dependencies.jar', 'rb') as f:

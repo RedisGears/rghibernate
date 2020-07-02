@@ -3,6 +3,8 @@ package com.redislabs;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.Serializable;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -16,6 +18,7 @@ import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.SessionFactoryBuilder;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
+import org.springframework.util.ReflectionUtils;
 
 import gears.GearsBuilder;
 
@@ -51,11 +54,59 @@ public class RGHibernate implements Closeable, Serializable {
   }
   
   public void recreateSession() {
-    session.clear();
-    session.close();
-    session = factory.openSession();
+    try {
+      session.clear();
+    }catch (Exception e) {
+      // TODO: handle exception
+    }
+    
+    try {
+      session.close();
+    } catch (Exception e) {
+      // TODO: handle exception
+    }
+    
+    try {
+      factory.close();
+    } catch (Exception e) {
+    // TODO: handle exception
+    }
+    
+    try {
+      registry.close();
+    } catch (Exception e) {
+    // TODO: handle exception
+    }
+    
+    generateSession();
   }
 
+  protected void cancelTimers() {
+    try {
+        for (Thread thread : Thread.getAllStackTraces().keySet())
+            if (thread.getClass().getSimpleName().equals("TimerThread"))
+                cancelTimer(thread);
+    } catch (Throwable e) {
+        e.printStackTrace();
+    }
+  }
+  
+  private void cancelTimer(Thread thread) throws Exception {
+      // Timer::cancel
+    Field f = ReflectionUtils.findField(thread.getClass(), "queue");
+    f.setAccessible(true);
+    Object queue = f.get(thread);
+    synchronized (queue) {
+      f = ReflectionUtils.findField(thread.getClass(), "newTasksMayBeScheduled");
+      f.setAccessible(true);
+      f.set(thread, false);
+      Method m = queue.getClass().getDeclaredMethod("clear");
+      m.setAccessible(true);
+      m.invoke(queue);
+      queue.notify();
+    }
+  }
+  
   @Override
   public void close() throws IOException {
     session.close();
@@ -74,6 +125,9 @@ public class RGHibernate implements Closeable, Serializable {
       // TODO Auto-generated catch block
       e.printStackTrace();
     }
+    
+    // Closing timer thread for oracle driver not to leak..
+    cancelTimers();
   }
 }
 
