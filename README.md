@@ -35,23 +35,11 @@ and
 
 
 ### Getting started
+* Change ./src/test/resources/hibernate.cfg.xml according to your database
+* Creating a mapping xml files match hibernate format (look at ./src/test/resources/Student.hbm.xml) for example
+* Deploy rghibernate to RedisGears
 
 ```bash
-# Deploy rghibernate as RedisGears function
-python3 gears.py 
+python3 ./gears.py <mapping_file_1> [<mapping_file_2> ...]
 
-# Set the MySQL connection
-redis-cli -x RG.TRIGGER set_connection < ./src/test/resources/hibernate.cfg.xml
-
-# Set the Professor mapping
-redis-cli -x RG.TRIGGER set_schema < ./src/test/resources/Professor.hbm.xml
-
-# Write a proffesor to Redis
-redis-cli hset Professor:123 firstName John lastName Phil email jhon.phil@tau.com
-
-# Set the Student mapping
-redis-cli -x RG.TRIGGER set_schema < ./src/test/resources/Student.hbm.xml
-
-# Write a student to Redis
-redis-cli hset Student:543 firstName Dan lastName Shon email dan.shon@tau.com
 ```
