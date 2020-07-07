@@ -1,7 +1,6 @@
 package com.redislabs;
 
 import java.io.Serializable;
-import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -18,7 +17,6 @@ import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.mapping.PersistentClass;
-import org.mariadb.jdbc.Driver;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -45,10 +43,6 @@ public class WriteBehind implements Serializable {
     int majorV = 99;
     int minorV = 99;
     int patchV = 99;
-    
-    public MetaData() {
-      
-    }
     
     public String getUuid() {
       return uuid;
@@ -99,34 +93,25 @@ public class WriteBehind implements Serializable {
     }
     
     @Override
-    public int compareTo(MetaData arg0) {
+    public int compareTo(MetaData other) {
       if(this.majorV == 99 && this.minorV == 99 && this.patchV == 99) {
         return 1;
       }
       
-      if(this.majorV > this.majorV) {
-        return 1;
-      }
-      if(this.majorV < this.majorV) {
-        return -1;
+      if(this.majorV != other.majorV) {
+        return this.majorV - other.majorV;
       }
       
-      if(this.minorV > this.minorV) {
-        return 1;
-      }
-      if(this.minorV < this.minorV) {
-        return -1;
+      if(this.minorV != other.minorV) {
+        return this.minorV - other.minorV;
       }
       
-      if(this.patchV > this.patchV) {
-        return 1;
-      }
-      if(this.patchV < this.patchV) {
-        return -1;
-      }
-      
-      return 0;
-      
+      return this.patchV - other.patchV;
+    }
+    
+    @Override
+    public boolean equals(Object other) {
+      return this.compareTo((MetaData) other) == 0;
     }
     
     public String toString() {
@@ -257,9 +242,7 @@ public class WriteBehind implements Serializable {
           GearsBuilder.execute(command); // Write to stream    
         }
         
-      }).register(ExecutionMode.SYNC, ()->{
-        System.setProperty("javax.xml.bind.JAXBContextFactory", "org.eclipse.persistence.jaxb.JAXBContextFactory");
-      }, ()->{});
+      }).register(ExecutionMode.SYNC, ()->System.setProperty("javax.xml.bind.JAXBContextFactory", "org.eclipse.persistence.jaxb.JAXBContextFactory"), ()->{});
     }
     
     tempRegistry.close();
@@ -287,7 +270,7 @@ public class WriteBehind implements Serializable {
           HashMap<String, Object> r) throws Exception {
         
         if(a == null) {
-          a = new ArrayList<HashMap<String, Object>>();
+          a = new ArrayList<>();
         }
         a.add(r);
         return a;
@@ -334,13 +317,11 @@ public class WriteBehind implements Serializable {
         throw e;
       }
     }).
-    map(r->r.size()).
+    map(ArrayList<HashMap<String, Object>>::size).
     register(ExecutionMode.ASYNC_LOCAL, () -> {
       System.setProperty("javax.xml.bind.JAXBContextFactory", "org.eclipse.persistence.jaxb.JAXBContextFactory");
       Thread.currentThread().setContextClassLoader(WriteBehind.class.getClassLoader());
       rghibernate.generateSession();
-    }, () -> {
-      rghibernate.close();
-    });
+    }, rghibernate::close);
   }
 }

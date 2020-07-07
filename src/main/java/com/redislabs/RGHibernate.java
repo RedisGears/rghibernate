@@ -16,7 +16,6 @@ import org.hibernate.boot.Metadata;
 import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
-import org.springframework.util.ReflectionUtils;
 
 
 public class RGHibernate implements Closeable, Serializable {
@@ -27,74 +26,74 @@ public class RGHibernate implements Closeable, Serializable {
   private transient Session session = null;
   private transient SessionFactory factory = null;
   private transient StandardServiceRegistry registry = null;
-  
+
   public RGHibernate(String[] args) {
     this.args = args;
   }
-  
+
   public void generateSession() {
     registry = new StandardServiceRegistryBuilder()
-        .configure( InMemoryURLFactory.getInstance().build("configuration", args[0]))
-        .build();
+        .configure(InMemoryURLFactory.getInstance().build("configuration", args[0])).build();
     MetadataSources sources = new MetadataSources(registry);
-    for(int i = 1 ; i < args.length ; ++i) {
+    for (int i = 1; i < args.length; ++i) {
       sources.addURL(InMemoryURLFactory.getInstance().build("mapping", args[i]));
     }
     Metadata metadata = sources.getMetadataBuilder().build();
-    
+
     factory = metadata.getSessionFactoryBuilder().build();
-    session = factory.openSession(); 
+    session = factory.openSession();
   }
 
   public Session getSession() {
     return session;
   }
-  
+
   public void recreateSession() {
     try {
       session.clear();
-    }catch (Exception e) {
+    } catch (Exception e) {
       // TODO: handle exception
     }
-    
+
     try {
       session.close();
     } catch (Exception e) {
       // TODO: handle exception
     }
-    
+
     try {
       factory.close();
     } catch (Exception e) {
-    // TODO: handle exception
+      // TODO: handle exception
     }
-    
+
     try {
       registry.close();
     } catch (Exception e) {
-    // TODO: handle exception
+      // TODO: handle exception
     }
-    
+
     generateSession();
   }
 
   protected void cancelTimers() {
     try {
-        for (Thread thread : Thread.getAllStackTraces().keySet())
-            if (thread.getClass().getSimpleName().equals("TimerThread"))
-                cancelTimer(thread);
+      for (Thread thread : Thread.getAllStackTraces().keySet())
+        if (thread.getClass().getSimpleName().equals("TimerThread"))
+          cancelTimer(thread);
     } catch (Throwable e) {
-        e.printStackTrace();
+      e.printStackTrace();
     }
   }
-  
+
   private void cancelTimer(Thread thread) throws Exception {
-      // Timer::cancel
-    Field f = ReflectionUtils.findField(thread.getClass(), "queue");
+    // Timer::cancel
+    
+    Field f = thread.getClass().getDeclaredField("queue");
     f.setAccessible(true);
     Object queue = f.get(thread);
     synchronized (queue) {
-      f = ReflectionUtils.findField(thread.getClass(), "newTasksMayBeScheduled");
+      f = thread.getClass().getDeclaredField("newTasksMayBeScheduled");
       f.setAccessible(true);
       f.set(thread, false);
       Method m = queue.getClass().getDeclaredMethod("clear");
@@ -103,28 +102,27 @@ public class RGHibernate implements Closeable, Serializable {
       queue.notify();
     }
   }
-  
+
   @Override
   public void close() throws IOException {
     session.close();
     factory.close();
-    
+
     try {
       Enumeration<Driver> de = DriverManager.getDrivers();
-      while(de.hasMoreElements()) {
+      while (de.hasMoreElements()) {
         Driver d = de.nextElement();
-        if(d.getClass().getClassLoader() == RGHibernate.class.getClassLoader()) {
+        if (d.getClass().getClassLoader() == RGHibernate.class.getClassLoader()) {
           DriverManager.deregisterDriver(d);
         }
-        
+
       }
     } catch (SQLException e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
     }
-    
+
     // Closing timer thread for oracle driver not to leak..
     cancelTimers();
   }
 }
-
