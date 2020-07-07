@@ -11,6 +11,7 @@ jobs:
       - image: circleci/mysql:8.0.4
         environment:
           MYSQL_ROOT_PASSWORD : my-secret-pw
+          MYSQL_ROOT_HOST: %          
           MYSQL_DATABASE : hibernate_db
           MYSQL_USER: user
           MYSQL_PASSWORD: passw0rd
@@ -44,9 +45,7 @@ jobs:
       - run: mvn integration-test -DreuseForks=true -DchildDelegation=true
       - run: mvn cobertura:cobertura          
       - run: bash <(curl -s https://codecov.io/bash) -t ${CODECOV_TOKEN}  
-              
-      #- run: mvn -s .circleci.settings.xml -DskipTests deploy
-      
+                    
 workflows:
   version: 2
   commit:
