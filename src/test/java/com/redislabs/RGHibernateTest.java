@@ -1,6 +1,7 @@
 package com.redislabs;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.HashMap;
@@ -15,13 +16,18 @@ public class RGHibernateTest {
 
 
   @Test
-  public void test() {
-
-    RGHibernate rgHibernate = new RGHibernate(getConfig("hibernate.cfg.xml"));
+  public void test() throws IOException {
+    String hibernate = getConfig("hibernate.cfg.xml");
+    String mapping1 = getConfig("Student.hbm.xml");
+    String mapping2 = getConfig("Professor.hbm.xml");
+    
+    String[] args = new String[] {hibernate, mapping1, mapping2};
+    
+    RGHibernate rgHibernate = new RGHibernate(args);
 
     // Add new Student mapping
-    rgHibernate.addMapping(getConfig("Student.hbm.xml"));
-    try (Session session = rgHibernate.openSession()) {
+    rgHibernate.generateSession();
+    try (Session session = rgHibernate.getSession()) {
 
       Transaction transaction = session.beginTransaction();
       Map item1 = new HashMap();
@@ -31,6 +37,7 @@ public class RGHibernateTest {
       item1.put( "email", "ron.don@tau.ac.il" );
       session.saveOrUpdate("Student", item1);
       transaction.commit();
+      session.clear();
       
       Transaction transaction2 = session.beginTransaction();
       Map item2 = new HashMap();
@@ -40,12 +47,8 @@ public class RGHibernateTest {
       item2.put( "email", "danni.din@tau.ac.il" );
       session.saveOrUpdate("Student", item2);
       transaction2.commit();
-    } 
-    
-    // Add new Professor mapping
-    rgHibernate.addMapping(getConfig("Professor.hbm.xml"));
-    try (Session session = rgHibernate.openSession()) {
-
+      session.clear();
+      
       Transaction transaction3 = session.beginTransaction();
       Map item3 = new HashMap();
       item3.put( "id", "51");
@@ -54,6 +57,7 @@ public class RGHibernateTest {
       item3.put( "email", "john.scott@tau.ac.il");
       session.saveOrUpdate("Professor", item3);
       transaction3.commit();
+      session.clear();
       
       Transaction transaction4 = session.beginTransaction();
       Map item4 = new HashMap();
@@ -63,7 +67,10 @@ public class RGHibernateTest {
       item4.put( "email", "danni.chin@tau.ac.il");
       session.saveOrUpdate("Student", item4);
       transaction4.commit();
+      session.clear();
     } 
+    
+    rgHibernate.close();
 
   }
 

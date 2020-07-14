@@ -14,13 +14,6 @@ import java.util.WeakHashMap;
 
 public class InMemoryURLFactory {
 
-//  public static void main(String... args) throws Exception {
-//      URL url = InMemoryURLFactory.getInstance().build("/this/is/a/test.txt", "This is a test!");
-//      byte[] data = IOUtils.toByteArray(url.openConnection().getInputStream());
-//      // Prints out: This is a test!
-//      System.out.println(new String(data));
-//  }
-
   private final Map<URL, byte[]> contents = new WeakHashMap<>();
   private final URLStreamHandler handler = new InMemoryStreamHandler();
 
@@ -38,7 +31,7 @@ public class InMemoryURLFactory {
 
   public URL build(String path, String data) {
       try {
-          return build(path, data.getBytes("UTF-8"));
+          return build(path, data.getBytes( "UTF-8"));
       } catch (UnsupportedEncodingException ex) {
           throw new RuntimeException(ex);
       }
