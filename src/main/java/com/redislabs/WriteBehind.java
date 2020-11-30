@@ -3,6 +3,9 @@ package com.redislabs;
 import gears.ExecutionMode;
 import gears.GearsBuilder;
 import gears.readers.CommandReader;
+import gears.readers.KeysReader;
+import gears.readers.StreamReader;
+import gears.readers.StreamReader.FailurePolicy;
 
 public class WriteBehind{
   
