@@ -8,7 +8,12 @@ import java.lang.reflect.Method;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
@@ -22,33 +27,46 @@ public class RGHibernate implements Closeable, Serializable {
 
   private static final long serialVersionUID = 1L;
 
-  private String[] args;
+  private static Map<String, RGHibernate> hibernateConnections = new HashMap<String, RGHibernate>();
+  
+  public static RGHibernate getOrCreate(String name) {
+    RGHibernate ret = hibernateConnections.get(name);
+    if(ret == null) {
+      ret = new RGHibernate(name);
+    }
+    return ret;
+  }
+  
+  public static RGHibernate get(String name) {
+    return hibernateConnections.get(name);
+  }
+  
+  private String name;
+  private String xmlConf;
+  private Map<String, String> sources;
   private transient Session session = null;
   private transient SessionFactory factory = null;
   private transient StandardServiceRegistry registry = null;
 
-  public RGHibernate(String[] args) {
-    this.args = args;
+  public RGHibernate(String name) {
+    this.name = name;
+    this.sources = new HashMap<>();
+    hibernateConnections.put(this.name, this);
+  }
+  
+  public String getXmlConf() {
+    return xmlConf;
   }
 
-  public void generateSession() {
-    registry = new StandardServiceRegistryBuilder()
-        .configure(InMemoryURLFactory.getInstance().build("configuration", args[0])).build();
-    MetadataSources sources = new MetadataSources(registry);
-    for (int i = 1; i < args.length; ++i) {
-      sources.addURL(InMemoryURLFactory.getInstance().build("mapping", args[i]));
+  public void setXmlConf(String xmlConf) {
+    this.xmlConf = xmlConf;
+  }
+  
+  public void CloseSession() {
+    if(session == null) {
+      return;
     }
-    Metadata metadata = sources.getMetadataBuilder().build();
-
-    factory = metadata.getSessionFactoryBuilder().build();
-    session = factory.openSession();
-  }
-
-  public Session getSession() {
-    return session;
-  }
-
-  public void recreateSession() {
+    
     try {
       session.clear();
     } catch (Exception e) {
@@ -72,9 +90,38 @@ public class RGHibernate implements Closeable, Serializable {
     } catch (Exception e) {
       // TODO: handle exception
     }
-
-    generateSession();
+    
+    session = null;
   }
+
+  private void GenerateSession() {
+    registry = new StandardServiceRegistryBuilder()
+        .configure(InMemoryURLFactory.getInstance().build("configuration", xmlConf)).build();
+    MetadataSources sources = new MetadataSources(registry);
+    Collection<String> srcs = this.sources.values();
+    for (String src : srcs) {
+      sources.addURL(InMemoryURLFactory.getInstance().build("mapping", src));
+    }
+    Metadata metadata = sources.getMetadataBuilder().build();
+
+    factory = metadata.getSessionFactoryBuilder().build();
+    session = factory.openSession();
+  }
+  
+  public void AddSource(String sourceName, String sourceXmlDef) {
+    sources.put(sourceName, sourceXmlDef);
+    synchronized (this) {
+      CloseSession();
+    }
+  }
+
+  public Session getSession() {
+    if(session == null) {
+      GenerateSession();
+    }
+    return session;
+  }
+
 
   protected void cancelTimers() {
     try {
@@ -105,8 +152,7 @@ public class RGHibernate implements Closeable, Serializable {
 
   @Override
   public void close() throws IOException {
-    session.close();
-    factory.close();
+    CloseSession();
 
     try {
       Enumeration<Driver> de = DriverManager.getDrivers();
