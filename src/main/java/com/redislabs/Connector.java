@@ -21,6 +21,7 @@ import org.hibernate.service.spi.ServiceRegistryImplementor;
 import gears.ExecutionMode;
 import gears.GearsBuilder;
 import gears.GearsFuture;
+import gears.LogLevel;
 import gears.operations.AccumulateOperation;
 import gears.operations.ForeachOperation;
 import gears.operations.OnRegisteredOperation;
@@ -203,8 +204,10 @@ OnUnregisteredOperation, Iterable<String>{
         transaction.commit();
         session.clear();
       }catch (Exception e) {
+        String msg = String.format("Failed commiting transaction error='%s'", e.toString());
+        GearsBuilder.log(msg, LogLevel.WARNING);
         connector.CloseSession();
-        throw e;
+        throw new Exception(msg);
       }
       
       if(lastStreamId != null) {

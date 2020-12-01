@@ -22,6 +22,8 @@ import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 
+import gears.GearsBuilder;
+
 
 public class RGHibernate implements Closeable, Serializable {
 
@@ -106,6 +108,7 @@ public class RGHibernate implements Closeable, Serializable {
 
     factory = metadata.getSessionFactoryBuilder().build();
     session = factory.openSession();
+    GearsBuilder.log(String.format("%s connector Connected successfully", name));
   }
   
   public void AddSource(String sourceName, String sourceXmlDef) {

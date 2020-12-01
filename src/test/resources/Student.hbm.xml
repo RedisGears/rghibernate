@@ -5,7 +5,7 @@
 		http://www.hibernate.org/xsd/hibernate-mapping/hibernate-mapping-4.0.xsd">
 
 	<class entity-name="Student" table="student">
-		<tuplizer entity-mode="dynamic-map" class="org.hibernate.tuple.entity.DynamicMapEntityTuplizer"/>
+	<tuplizer entity-mode="dynamic-map" class="org.hibernate.tuple.entity.DynamicMapEntityTuplizer"/>
       	<id name="id" type="string" length="50" column="id"/>
       	<property name="firstName" column="first_name" type="string"/>
       	<property name="lastName" column="last_name" type="string"/>
