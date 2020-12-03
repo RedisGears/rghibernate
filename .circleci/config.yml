@@ -1,64 +1,71 @@
-# Java Maven CircleCI 2.0 configuration file
-#
-# Check https://circleci.com/docs/2.0/language-java/ for more details
-#
-version: 2
-jobs:
-  build:
-    docker:
-      - image: circleci/openjdk:11.0.7-jdk-buster
-      
-      - image: circleci/mysql:8.0.4
-        environment:
-          MYSQL_ROOT_PASSWORD : my-secret-pw
-          MYSQL_ROOT_HOST: %          
-          MYSQL_DATABASE : hibernate_db
-          MYSQL_USER: user
-          MYSQL_PASSWORD: passw0rd
-      
-    working_directory: ~/repo
+version: 2.1
 
-    environment:
-      # Customize the JVM maximum heap limit
-      MAVEN_OPTS: -Xmx3200m
-
+commands: 
+  setup-automation:
     steps:
+      - run:
+          name: Setup automation
+          command: |
+            git submodule update --init --recursive
+            ./deps/readies/bin/getpy3
+            ./deps/readies/bin/getpy2
+            python3 ./deps/readies/bin/system-setup.py
 
-      - checkout
+jobs:
+  build-and-test-bionic:
+      docker:
+        - image: 'ubuntu:bionic'
+      steps:
+        - run:
+            name: Setup executor
+            command: |
+              apt-get -qq update
+              apt-get -q install -y git openssh-client curl ca-certificates make tar gzip python3-dev unzip python-pip maven
+        - checkout
+        - setup-automation
+        - run:
+            name: Install Redis
+            command: ./deps/readies/bin/getredis --version 6
+        - run:
+            name: Install RLTest
+            command: python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master docker sqlalchemy cx_Oracle cx-oracle
+        - run:
+            name: Install Oracle client
+            command: /bin/bash install_oracle_driver.sh
+        - run:
+            name: Tests
+            command: make tests
 
-      # Download and cache dependencies
-      - restore_cache:
-          keys:
-          - v1-dependencies-{{ checksum "pom.xml" }}
-          # fallback to using the latest cache if no exact match is found
-          - v1-dependencies-
+on-any-branch: &on-any-branch
+  filters:
+    branches:
+      only: /.*/
+    tags:
+      only: /.*/
 
-      - run: mvn dependency:go-offline
+on-master: &on-master
+  filters:
+    branches:
+      only: master
 
-      - save_cache:
-          paths:
-            - ~/.m2
-          key: v1-dependencies-{{ checksum "pom.xml" }}
-        
-      # run tests!
-      - run: mvn pmd:check
-      - run: mvn integration-test -DreuseForks=true -DchildDelegation=true
-      - run: mvn cobertura:cobertura          
-      - run: bash <(curl -s https://codecov.io/bash) -t ${CODECOV_TOKEN}  
-                    
+after-build-and-test: &after-build-and-test
+  requires:
+    - build-and-test-bionic
+
 workflows:
   version: 2
   commit:
     jobs:
-      - build
-  nightly:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - master
-    jobs:
-      - build
+      - build-and-test-bionic:
+          <<: *on-any-branch
 
+  nightly:
+      triggers:
+        - schedule:
+            cron: "0 0 * * *"
+            filters:
+              branches:
+                only:
+                  - master
+      jobs:
+        - build-and-test-bionic

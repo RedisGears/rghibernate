@@ -17,3 +17,6 @@ install: build installRedisGears installJVMPlugin
 
 run: install
 	/bin/bash ./run.sh
+
+tests: install
+	cd pytest; python3 -m RLTest --clear-logs -s
