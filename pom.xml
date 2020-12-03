@@ -72,6 +72,8 @@
 			<groupId>com.redislabs</groupId>
 			<artifactId>gear_runtime</artifactId>
 			<version>0.0.3-SNAPSHOT</version>
+			<scope>system</scope>
+			<systemPath>${project.basedir}/bin/RedisGears_JVMPlugin/gears_runtime/target/gear_runtime-jar-with-dependencies.jar</systemPath>
 		</dependency>
 		<dependency>
 			<groupId>org.mariadb.jdbc</groupId>
