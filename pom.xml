@@ -42,6 +42,7 @@
 		<maven.compiler.target>8</maven.compiler.target>
 		<maven.test.source>8</maven.test.source>
 		<maven.test.target>8</maven.test.target>
+		<jar.finalName>rghibernate</jar.finalName>
 	</properties>
 	<repositories>
 		<repository>
@@ -182,6 +183,7 @@
 				<artifactId>maven-assembly-plugin</artifactId>
 				<version>2.5.4</version>
 				<configuration>
+					<finalName>rghibernate</finalName>
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
 					</descriptorRefs>
