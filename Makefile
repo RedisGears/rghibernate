@@ -1,22 +1,19 @@
-#OS=$(shell ./deps/readies/bin/platform --osnick)
-OS=bionic
+OS=$(shell ./deps/readies/bin/platform --osnick)
 $(info OS=$(OS))
 
 all: build
 	
-build:
-	mvn -Dmaven.test.skip=true package
-
 installRedisGears:
 	OS=$(OS) /bin/bash ./Install_RedisGears.sh
 
 installJVMPlugin:
-	OS=$(OS) /bin/bash ./Install_JVMPlugin.sh
+	OS=bionic /bin/bash ./Install_JVMPlugin.sh
 
-install: build installRedisGears installJVMPlugin
+build: installRedisGears installJVMPlugin
+	mvn -Dmaven.test.skip=true package
 
-run: install
+run: build
 	/bin/bash ./run.sh
 
-tests: install
+tests: build
 	cd pytest; python3 -m RLTest --clear-logs -s
