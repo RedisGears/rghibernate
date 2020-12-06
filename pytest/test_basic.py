@@ -5,6 +5,29 @@ import time
 import subprocess
 import docker
 import signal
+from threading import Thread
+
+class Background(object):
+    """
+    A context manager that fires a TimeExpired exception if it does not
+    return within the specified amount of time.
+    """
+
+    def doJob(self):
+        self.f()
+        self.isAlive = False
+
+    def __init__(self, f):
+        self.f = f
+        self.isAlive = True
+
+    def __enter__(self):
+        self.t = Thread(target = self.doJob)
+        self.t.start()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.t.join()
 
 class TimeLimit(object):
     """
@@ -42,23 +65,12 @@ def GetConnection():
         except Exception as e:
             time.sleep(1)
 
-def GetDockerContainer():
-    client = docker.from_env()
-    container = [container for container in client.containers.list() if container.attrs['Config']['Image'] == 'quay.io/maksymbilenko/oracle-12c']
-    if len(container) == 0:
-        print('Starting oracle container')
-        process = subprocess.Popen(['/bin/bash', '../install_oracle.sh'], stdout=subprocess.PIPE)
-        while len(container) == 0:
-            container = [container for container in client.containers.list() if container.attrs['Config']['Image'] == 'quay.io/maksymbilenko/oracle-12c']
-    else:
-        print('Oracle container already running')
-    
-    return container[0]
-
 class genericTest:
     def __init__(self, writePolicy):
         
-        self.container = GetDockerContainer()
+        self.client = docker.from_env()
+        self.container = self.getDockerContainer()
+        self.network = [n for n in self.client.networks.list() if n.name == 'bridge'][0]
 
         self.dbConn = GetConnection()
 
@@ -78,6 +90,24 @@ class genericTest:
         except Exception:
             pass
         self.env.cmd('flushall')
+
+    def disconnectDockerFromNetwork(self):
+        self.network.disconnect(self.container.attrs['Id'])
+
+    def connectDockerToNetwork(self):
+        self.network.connect(self.container.attrs['Id'])
+
+    def getDockerContainer(self):
+        container = [container for container in self.client.containers.list() if container.attrs['Config']['Image'] == 'quay.io/maksymbilenko/oracle-12c']
+        if len(container) == 0:
+            print('Starting oracle container')
+            process = subprocess.Popen(['/bin/bash', '../install_oracle.sh'], stdout=subprocess.PIPE)
+            while len(container) == 0:
+                container = [container for container in self.client.containers.list() if container.attrs['Config']['Image'] == 'quay.io/maksymbilenko/oracle-12c']
+        else:
+            print('Oracle container already running')
+    
+        return container[0]
 
 class testWriteBehind(genericTest):
     def __init__(self):
@@ -143,15 +173,15 @@ class testWriteBehind(genericTest):
                     pass
 
     def testStopDBOnTrafic(self):
-        self.container.stop()
-
         for i in range(100):
             self.env.cmd('hmset', 'Student:%d' % i, 'firstName', 'foo', 'lastName', 'bar', 'email', 'email')
+            if i == 50:
+                self.disconnectDockerFromNetwork()
+        
+        self.connectDockerToNetwork()
 
-        with TimeLimit(60*5, self.env, 'Failed connecting to db after docker restart'):
-            self.container = GetDockerContainer()
-            self.dbConn = GetConnection()
-
+        self.dbConn = GetConnection()
+        
         # make sure all data was written
         result = None
         res = None
@@ -164,3 +194,65 @@ class testWriteBehind(genericTest):
                 except Exception as e:
                     pass
         self.env.assertEqual(res, (100,))
+
+class testWriteThrough(genericTest):
+
+    def __init__(self):
+        genericTest.__init__(self, 'WriteThrough')
+
+    def testSimpleWriteThrough(self):
+        self.env.cmd('hset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email')
+
+        result = self.dbConn.execute(text('select * from student'))
+        res = result.next()
+
+        self.env.assertEqual(res, ('1', 'foo', 'bar', 'email'))
+
+        self.env.cmd('del', 'Student:1')
+
+        result = self.dbConn.execute(text('select * from student'))
+
+        try:
+            result.next()
+            self.env.assertTrue(False, message='got results when expecting no results')
+        except Exception:
+            pass
+        
+    def testSimpleWriteThrough2(self):
+        for i in range(100):
+            self.env.cmd('hmset', 'Student:%d' % i, 'firstName', 'foo', 'lastName', 'bar', 'email', 'email')
+        
+        result = self.dbConn.execute(text('select count(*) from student'))
+        res = result.next()
+
+        self.env.assertEqual(res, (100,))
+
+        for i in range(100):
+            self.env.cmd('del', 'Student:%d' % i)
+        
+
+        result = self.dbConn.execute(text('select * from student'))
+        try:
+            result.next()
+            self.env.assertTrue(False, message='got results when expecting no results')
+        except Exception:
+            pass
+
+    def testStopDBOnTrafic(self):
+        def background():
+            for i in range(100):
+                self.env.cmd('hmset', 'Student:%d' % i, 'firstName', 'foo', 'lastName', 'bar', 'email', 'email')
+
+            self.dbConn = GetConnection()
+
+            result = self.dbConn.execute(text('select count(*) from student'))
+            res = result.next()
+
+            self.env.assertEqual(res, (100,))
+
+        with TimeLimit(60*5, self.env, 'Failed waiting for data to reach the database'):
+            with Background(background):
+                time.sleep(0.5)
+                self.disconnectDockerFromNetwork()
+                time.sleep(0.5)
+                self.connectDockerToNetwork()

@@ -98,7 +98,7 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
         setPattern(enteryName + ":*").
         setEventTypes(new String[] {"hset", "hmset", "del", "changed"});
         
-    GearsBuilder<KeysReaderRecord> builder = GearsBuilder.CreateGearsBuilder(reader, this.toString());
+    GearsBuilder<KeysReaderRecord> builder = GearsBuilder.CreateGearsBuilder(reader, "keys reader for source " + this.name);
     builder.foreach(this).
     register(ExecutionMode.SYNC, this, this);
     
@@ -267,6 +267,7 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
     s.add(propertyMappings);
     s.add("WritePolicy");
     s.add(writeThrough ? "writeThrough" : "writeBehind");
+    
     return s.iterator();
   }
   
