@@ -16,12 +16,14 @@ public class PropertyData implements Serializable{
   private boolean isNullable;
   private Type type;
   private AbstractStandardBasicType<?> adType;
+  private boolean isId;
   
-  public PropertyData(String name, String columnName, Type type, boolean isNullable) {
+  public PropertyData(String name, String columnName, Type type, boolean isNullable, boolean isId) {
       this.name = name;
       this.type = type;
       this.columnName = columnName;
       this.isNullable = isNullable;
+      this.isId = isId;
       
       if(this.type instanceof AbstractStandardBasicType<?>) {
         this.adType = (AbstractStandardBasicType<?>)this.type;
@@ -51,10 +53,14 @@ public class PropertyData implements Serializable{
   public boolean isNullable() {
     return isNullable;
   }
+  
+  public boolean isId() {
+    return isId;
+  }
 
   @Override
   public String toString() {
-    return String.format("%s -> %s (type: %s, mandatory: %b)", getName(), getColumnName(), getType(), !isNullable());
+    return String.format("%s -> %s (type: %s, mandatory: %b, isId: %b)", getName(), getColumnName(), getType(), !isNullable(), isId());
   }
   
   

@@ -18,6 +18,7 @@ import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.boot.registry.internal.StandardServiceRegistryImpl;
 import org.hibernate.service.Service;
 import org.hibernate.service.spi.ServiceRegistryImplementor;
+import org.hibernate.tuple.IdentifierProperty;
 
 import gears.ExecutionMode;
 import gears.GearsBuilder;
@@ -183,18 +184,28 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     Source source = Source.getSource(sourceName);
     
     Map<String, Object> newMap = new HashMap<String, Object>();
+    PropertyData idProperty =  source.getIdProperty();
+    
+    String val = map.remove(idProperty.getName());
+    Object convertedVal = null;
+    try {
+      convertedVal = idProperty.convert(val);
+    }catch (Exception e) {
+      String msg = String.format("Can not conver id property %s val %s, error='%s'", idProperty.getName(), val, e.toString());
+      GearsBuilder.log(msg, LogLevel.WARNING);
+      throw new Exception(msg);
+    }
+
+    newMap.put(idProperty.getName(), convertedVal);
+    newMap.put(ENTETY_NAME_STR, map.remove(ENTETY_NAME_STR));
+    newMap.put(EVENT_STR, map.remove(EVENT_STR));
+    newMap.put(SOURCE_STR, map.remove(SOURCE_STR));
     
     for(String key : map.keySet()) {
-      String val = map.get(key);
-      if(key.equals(ENTETY_NAME_STR) ||
-         key.equals(EVENT_STR) ||
-         key.equals(source.getIdName()) || 
-         key.equals(SOURCE_STR)) {
-        newMap.put(key, val);
-        continue;
-      }
+      val = map.get(key);
+      
       PropertyData pm = null;
-      Object convertedVal = null;
+      convertedVal = null;
       try {
         pm = source.getPropertyMapping(key);
         convertedVal = pm.convert(val);
@@ -235,7 +246,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
               transaction = session.beginTransaction();
               isMerge = true;
             }
-            session.persist((String)map.remove(ENTETY_NAME_STR), map);
+            session.merge((String)map.remove(ENTETY_NAME_STR), map);
           }else {
             if(isMerge) {
               transaction.commit();
@@ -244,8 +255,11 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
               isMerge = false;
             }
             Source source = Source.getSource(sourceName);
-            Object o = session.get((String)map.remove(ENTETY_NAME_STR), (Serializable)map.get(source.getIdName()));
-            session.delete(o);
+            Object o = session.get((String)map.remove(ENTETY_NAME_STR), (Serializable)map.get(source.getIdProperty().getName()));
+            // o can be null on hdel that removed the last field
+            if(o != null) {
+              session.delete(o);
+            }
           }
         }
         

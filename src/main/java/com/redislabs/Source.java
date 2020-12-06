@@ -6,7 +6,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.stream.Stream;
@@ -51,7 +50,7 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
   private String connector;
   private String xmlDef;
   private String streamName;
-  private String idName;
+  private PropertyData idProperty;  
   private HashMap<String, PropertyData> propertyMappings;
   private boolean writeThrough;
   
@@ -87,12 +86,16 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
     Metadata metadata = tempSources.getMetadataBuilder().build();
     PersistentClass pc = metadata.getEntityBindings().iterator().next();
     String enteryName = pc.getEntityName();
-    idName = pc.getIdentifierProperty().getName();
+    Property idProp = pc.getIdentifierProperty();
+    idProperty =  new PropertyData(idProp.getName(), 
+        ((Column)idProp.getColumnIterator().next()).getName(), 
+        idProp.getType(), idProp.isOptional(), true);
     Iterator<Property> iter = pc.getPropertyIterator();
     while(iter.hasNext()) {
       Property p = iter.next();
       PropertyData pd = new PropertyData(p.getName(), 
-          ((Column)p.getColumnIterator().next()).getName(), p.getType(), p.isOptional());
+          ((Column)p.getColumnIterator().next()).getName(), 
+          p.getType(), p.isOptional(), false);
       propertyMappings.put(pd.getName(), pd);
     }
     
@@ -100,7 +103,7 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
    
     KeysReader reader = new KeysReader().
         setPattern(enteryName + ":*").
-        setEventTypes(new String[] {"hset", "hmset", "del", "changed"});
+        setEventTypes(new String[] {"hset", "hmset", "hincrbyfloat", "hincrby", "hdel", "del", "changed"});
         
     GearsBuilder<KeysReaderRecord> builder = GearsBuilder.CreateGearsBuilder(reader, "keys reader for source " + this.name);
     builder.foreach(this).
@@ -193,8 +196,23 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
       asyncMap(asyncMapper).register(ExecutionMode.ASYNC_LOCAL, 
           ()->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
       
+      CommandOverrider hincrbyfloatco = new CommandOverrider().setCommand("hincrbyfloat");
+      GearsBuilder.CreateGearsBuilder(hincrbyfloatco, "hmsetco command override").
+      asyncMap(asyncMapper).register(ExecutionMode.ASYNC_LOCAL, 
+          ()->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
+      
       CommandOverrider hincrbyco = new CommandOverrider().setCommand("hincrby");
       GearsBuilder.CreateGearsBuilder(hincrbyco, "hmsetco command override").
+      asyncMap(asyncMapper).register(ExecutionMode.ASYNC_LOCAL, 
+          ()->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
+      
+      CommandOverrider hdelco = new CommandOverrider().setCommand("hdel");
+      GearsBuilder.CreateGearsBuilder(hdelco, "hmsetco command override").
+      asyncMap(asyncMapper).register(ExecutionMode.ASYNC_LOCAL, 
+          ()->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
+      
+      CommandOverrider hsetnxco = new CommandOverrider().setCommand("hsetnx");
+      GearsBuilder.CreateGearsBuilder(hsetnxco, "hmsetco command override").
       asyncMap(asyncMapper).register(ExecutionMode.ASYNC_LOCAL, 
           ()->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
     }
@@ -215,24 +233,51 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
 
   @Override
   public void foreach(KeysReaderRecord record) throws Exception {
-    Map<String, String> value = record.getHashVal();
     String key = record.getKey();
     String[] keySplit = key.split(":");
     
+    String id = keySplit[1];
+    // make sure id has the correct type
+    try {
+      idProperty.convert(id);
+    }catch (Exception e) {
+      String msg = String.format("Failed parsing id field \"%s\", value \"%s\", error=\"%s\"", idProperty.getName(), id, e.toString());
+      GearsBuilder.log(msg, LogLevel.WARNING);
+      if(this.writeThrough) {
+        List<GearsFuture<Serializable>> l = threadLocal.get();
+        if(l == null) {
+          l = new ArrayList<GearsFuture<Serializable>>();
+          threadLocal.set(l);
+        }
+        GearsFuture<Serializable> f = new GearsFuture<Serializable>();
+        l.add(f);
+        f.setError(msg);
+      } 
+      throw new Exception(msg);
+    }
+    
     String[] command;
-    Stream<String> commandStream = Stream.of("XADD", String.format("%s-{%s}", streamName, GearsBuilder.hashtag()), "*", 
-                                             Connector.ENTETY_NAME_STR, keySplit[0], idName, keySplit[1], 
-                                             Connector.EVENT_STR, record.getEvent(), Connector.SOURCE_STR, name);
-    if(record.getEvent().charAt(0) != 'd') {
+    Stream<String> commandStreamInit = Stream.of("XADD", String.format("%s-{%s}", streamName, GearsBuilder.hashtag()), "*", 
+                                             Connector.ENTETY_NAME_STR, keySplit[0], idProperty.getName(), keySplit[1], 
+                                             Connector.SOURCE_STR, name);
+    
+    Map<String, String> value = record.getHashVal();
+    // null value here will be considered as delete
+    if(value != null) {
+      Stream<String> commandStream = Stream.concat(commandStreamInit, Stream.of(Connector.EVENT_STR, "hset"));
+      
       // verify schema:
+      Map<String, String> valuesToWrite = new HashMap<String, String>();
       for(PropertyData pd : propertyMappings.values()) {
         String val = null;
         try {
           val = value.get(pd.getName());
-          if(val == null && !pd.isNullable()) {
+          if(val != null) {
+            pd.convert(val);
+            valuesToWrite.put(pd.getName(), val);
+          }else if(!pd.isNullable()) {
             throw new Exception(String.format("mandatory \"%s\" value is not set", pd.getName()));
           }
-          pd.convert(val);
         }catch(Exception e) {
           String msg = String.format("Failed parsing acheme for field \"%s\", value \"%s\", error=\"%s\"", pd.getName(), val, e.toString());
           GearsBuilder.log(msg, LogLevel.WARNING);
@@ -250,11 +295,12 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
         }
       }      
       
-      Stream<String> fieldsStream = value.entrySet().stream()
+      Stream<String> fieldsStream = valuesToWrite.entrySet().stream()
           .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue()));
 
       command = Stream.concat(commandStream, fieldsStream).toArray(String[]::new);
     }else {
+      Stream<String> commandStream = Stream.concat(commandStreamInit, Stream.of(Connector.EVENT_STR, "del"));
       command = commandStream.toArray(String[]::new);
     }
 
@@ -288,7 +334,7 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
   
   @Override
   public String toString() {
-    return String.format("name: %s, connector: %s, xmlDef: %s, idName: %s", name, connector, xmlDef, idName);
+    return String.format("name: %s, connector: %s, xmlDef: %s, idName: %s", name, connector, xmlDef, idProperty.getName());
   }
   
   @Override
@@ -298,8 +344,8 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
     s.add(name);
     s.add("connector");
     s.add(connector);
-    s.add("idName");
-    s.add(idName);
+    s.add("idProperty");
+    s.add(idProperty);
     s.add("Mappings");
     s.add(propertyMappings.values());
     s.add("WritePolicy");
@@ -312,8 +358,8 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
     return propertyMappings.get(name);
   }
 
-  public String getIdName() {
-    return idName;
+  public PropertyData getIdProperty() {
+    return idProperty;
   }  
   
 }

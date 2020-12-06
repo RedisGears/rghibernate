@@ -127,7 +127,7 @@ class testWriteBehind(genericTest):
                 except Exception as e:
                     pass
 
-        self.env.assertEqual(res, ('1', 'foo', 'bar', 'email', 10))
+        self.env.assertEqual(res, (1, 'foo', 'bar', 'email', 10))
 
         self.env.cmd('del', 'Student:1')
 
@@ -206,7 +206,7 @@ class testWriteThrough(genericTest):
         result = self.dbConn.execute(text('select * from student'))
         res = result.next()
 
-        self.env.assertEqual(res, ('1', 'foo', 'bar', 'email', 10))
+        self.env.assertEqual(res, (1, 'foo', 'bar', 'email', 10))
 
         self.env.cmd('del', 'Student:1')
 
@@ -262,3 +262,93 @@ class testWriteThrough(genericTest):
 
     def testBadValueAccordingToSchema(self):
         self.env.expect('hmset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', 'test').error().contains('Failed parsing acheme for field "age"')
+
+    def testBadIdValue(self):
+        self.env.expect('hmset', 'Student:test', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', 'test').error().contains('Failed parsing id field "id"')
+
+    def testExtraHashFieldsAreIgnored(self):
+        self.env.cmd('hset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10', 'bearth_year', 1999)
+
+        self.env.expect('hget', 'Student:1', 'bearth_year').equal(b'1999')
+
+        result = self.dbConn.execute(text('select * from student'))
+        res = result.next()
+
+        self.env.assertEqual(res, (1, 'foo', 'bar', 'email', 10))
+
+    def testHIncrByFloat(self):
+        self.env.cmd('hset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10')
+
+        self.env.cmd('hincrbyfloat', 'Student:1', 'age', '2')
+
+        result = self.dbConn.execute(text('select * from student'))
+        res = result.next()
+
+        self.env.assertEqual(res, (1, 'foo', 'bar', 'email', 12))
+
+    def testHIncr(self):
+        self.env.cmd('hset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10')
+
+        self.env.cmd('hincrby', 'Student:1', 'age', '2')
+
+        result = self.dbConn.execute(text('select * from student'))
+        res = result.next()
+
+        self.env.assertEqual(res, (1, 'foo', 'bar', 'email', 12))
+
+    def testNotMandatoryValue(self):
+        self.env.cmd('hset', 'Student:1', 'lastName', 'bar', 'email', 'email', 'age', '10')
+
+        result = self.dbConn.execute(text('select * from student'))
+        res = result.next()
+
+        self.env.assertEqual(res, (1, None, 'bar', 'email', 10))
+
+    def testHdel(self):
+        self.env.cmd('hset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10')
+
+        result = self.dbConn.execute(text('select * from student'))
+        res = result.next()
+
+        self.env.assertEqual(res, (1, 'foo', 'bar', 'email', 10))
+
+        self.env.cmd('hdel', 'Student:1', 'firstName')
+
+        result = self.dbConn.execute(text('select * from student'))
+        res = result.next()
+
+        self.env.assertEqual(res, (1, None, 'bar', 'email', 10))
+
+    def testHsetnx(self):
+        self.env.cmd('hset', 'Student:1', 'lastName', 'bar', 'email', 'email', 'age', '10')
+
+        result = self.dbConn.execute(text('select * from student'))
+        res = result.next()
+
+        self.env.assertEqual(res, (1, None, 'bar', 'email', 10))
+
+        self.env.cmd('hsetnx', 'Student:1', 'firstName', 'foo')        
+
+        result = self.dbConn.execute(text('select * from student'))
+        res = result.next()
+
+        self.env.assertEqual(res, (1, 'foo', 'bar', 'email', 10))
+
+    def testHdelOnMandatoryField(self):
+        self.env.cmd('hset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10')
+
+        result = self.dbConn.execute(text('select * from student'))
+        res = result.next()
+
+        self.env.assertEqual(res, (1, 'foo', 'bar', 'email', 10))
+
+        self.env.expect('hdel', 'Student:1', 'email').error().contains('mandatory "email" value is not set')
+
+        self.env.cmd('hdel', 'Student:1', 'firstName', 'lastName', 'age')
+
+        result = self.dbConn.execute(text('select * from student'))
+        try:
+            result.next()
+            self.env.assertTrue(False, message='got results when expecting no results')
+        except Exception:
+            pass
