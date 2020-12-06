@@ -114,7 +114,7 @@ class testWriteBehind(genericTest):
         genericTest.__init__(self, 'WriteBehind')
 
     def testSimpleWriteBehind(self):
-        self.env.cmd('hset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email')
+        self.env.cmd('hset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10')
 
         result = None
         res = None
@@ -127,7 +127,7 @@ class testWriteBehind(genericTest):
                 except Exception as e:
                     pass
 
-        self.env.assertEqual(res, ('1', 'foo', 'bar', 'email'))
+        self.env.assertEqual(res, ('1', 'foo', 'bar', 'email', 10))
 
         self.env.cmd('del', 'Student:1')
 
@@ -143,7 +143,7 @@ class testWriteBehind(genericTest):
 
     def testSimpleWriteBehind2(self):
         for i in range(100):
-            self.env.cmd('hmset', 'Student:%d' % i, 'firstName', 'foo', 'lastName', 'bar', 'email', 'email')
+            self.env.cmd('hmset', 'Student:%d' % i, 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10')
 
         result = None
         res = None
@@ -174,7 +174,7 @@ class testWriteBehind(genericTest):
 
     def testStopDBOnTrafic(self):
         for i in range(100):
-            self.env.cmd('hmset', 'Student:%d' % i, 'firstName', 'foo', 'lastName', 'bar', 'email', 'email')
+            self.env.cmd('hmset', 'Student:%d' % i, 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10')
             if i == 50:
                 self.disconnectDockerFromNetwork()
         
@@ -201,12 +201,12 @@ class testWriteThrough(genericTest):
         genericTest.__init__(self, 'WriteThrough')
 
     def testSimpleWriteThrough(self):
-        self.env.cmd('hset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email')
+        self.env.cmd('hset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10')
 
         result = self.dbConn.execute(text('select * from student'))
         res = result.next()
 
-        self.env.assertEqual(res, ('1', 'foo', 'bar', 'email'))
+        self.env.assertEqual(res, ('1', 'foo', 'bar', 'email', 10))
 
         self.env.cmd('del', 'Student:1')
 
@@ -220,7 +220,7 @@ class testWriteThrough(genericTest):
         
     def testSimpleWriteThrough2(self):
         for i in range(100):
-            self.env.cmd('hmset', 'Student:%d' % i, 'firstName', 'foo', 'lastName', 'bar', 'email', 'email')
+            self.env.cmd('hmset', 'Student:%d' % i, 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10')
         
         result = self.dbConn.execute(text('select count(*) from student'))
         res = result.next()
@@ -241,7 +241,7 @@ class testWriteThrough(genericTest):
     def testStopDBOnTrafic(self):
         def background():
             for i in range(100):
-                self.env.cmd('hmset', 'Student:%d' % i, 'firstName', 'foo', 'lastName', 'bar', 'email', 'email')
+                self.env.cmd('hmset', 'Student:%d' % i, 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10')
 
             self.dbConn = GetConnection()
 
@@ -256,3 +256,9 @@ class testWriteThrough(genericTest):
                 self.disconnectDockerFromNetwork()
                 time.sleep(0.5)
                 self.connectDockerToNetwork()
+
+    def testMandatoryValueMissing(self):
+        self.env.expect('hmset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'age', '10').error().contains('mandatory "email" value is not set')
+
+    def testBadValueAccordingToSchema(self):
+        self.env.expect('hmset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', 'test').error().contains('Failed parsing acheme for field "age"')

@@ -6,6 +6,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.stream.Stream;
 import java.io.Serializable;
@@ -50,12 +52,12 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
   private String xmlDef;
   private String streamName;
   private String idName;
-  private List<String> propertyMappings;
+  private HashMap<String, PropertyData> propertyMappings;
   private boolean writeThrough;
   
   private static ThreadLocal<List<GearsFuture<Serializable>>> threadLocal = new ThreadLocal<>();;
   
-  private static Map<String, Source> sources = new HashMap<>();
+  private static Map<String, Source> sources = new ConcurrentHashMap<>();
   
   public static Source getSource(String name) {
     return sources.get(name);    
@@ -69,7 +71,7 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
     this.name = name;
     this.connector = connector;
     this.xmlDef = xmlDef;
-    this.propertyMappings = new ArrayList<String>();
+    this.propertyMappings = new HashMap<String, PropertyData>();
     this.writeThrough = writeThrough;
     
     Connector c = Connector.GetConnector(connector);
@@ -89,7 +91,9 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
     Iterator<Property> iter = pc.getPropertyIterator();
     while(iter.hasNext()) {
       Property p = iter.next();
-      propertyMappings.add(String.format("%s -> %s", p.getName(), ((Column)p.getColumnIterator().next()).getName()));
+      PropertyData pd = new PropertyData(p.getName(), 
+          ((Column)p.getColumnIterator().next()).getName(), p.getType(), p.isOptional());
+      propertyMappings.put(pd.getName(), pd);
     }
     
     tempRegistry.close();
@@ -188,6 +192,11 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
       GearsBuilder.CreateGearsBuilder(hmsetco, "hmsetco command override").
       asyncMap(asyncMapper).register(ExecutionMode.ASYNC_LOCAL, 
           ()->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
+      
+      CommandOverrider hincrbyco = new CommandOverrider().setCommand("hincrby");
+      GearsBuilder.CreateGearsBuilder(hincrbyco, "hmsetco command override").
+      asyncMap(asyncMapper).register(ExecutionMode.ASYNC_LOCAL, 
+          ()->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
     }
     
   }
@@ -209,10 +218,38 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
     Map<String, String> value = record.getHashVal();
     String key = record.getKey();
     String[] keySplit = key.split(":");
-
+    
     String[] command;
-    Stream<String> commandStream = Stream.of("XADD", String.format("%s-{%s}", streamName, GearsBuilder.hashtag()), "*", "entityName", keySplit[0], idName, keySplit[1], "event", record.getEvent());
+    Stream<String> commandStream = Stream.of("XADD", String.format("%s-{%s}", streamName, GearsBuilder.hashtag()), "*", 
+                                             Connector.ENTETY_NAME_STR, keySplit[0], idName, keySplit[1], 
+                                             Connector.EVENT_STR, record.getEvent(), Connector.SOURCE_STR, name);
     if(record.getEvent().charAt(0) != 'd') {
+      // verify schema:
+      for(PropertyData pd : propertyMappings.values()) {
+        String val = null;
+        try {
+          val = value.get(pd.getName());
+          if(val == null && !pd.isNullable()) {
+            throw new Exception(String.format("mandatory \"%s\" value is not set", pd.getName()));
+          }
+          pd.convert(val);
+        }catch(Exception e) {
+          String msg = String.format("Failed parsing acheme for field \"%s\", value \"%s\", error=\"%s\"", pd.getName(), val, e.toString());
+          GearsBuilder.log(msg, LogLevel.WARNING);
+          if(this.writeThrough) {
+            List<GearsFuture<Serializable>> l = threadLocal.get();
+            if(l == null) {
+              l = new ArrayList<GearsFuture<Serializable>>();
+              threadLocal.set(l);
+            }
+            GearsFuture<Serializable> f = new GearsFuture<Serializable>();
+            l.add(f);
+            f.setError(msg);
+          } 
+          throw new Exception(msg);
+        }
+      }      
+      
       Stream<String> fieldsStream = value.entrySet().stream()
           .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue()));
 
@@ -264,11 +301,19 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
     s.add("idName");
     s.add(idName);
     s.add("Mappings");
-    s.add(propertyMappings);
+    s.add(propertyMappings.values());
     s.add("WritePolicy");
     s.add(writeThrough ? "writeThrough" : "writeBehind");
     
     return s.iterator();
   }
+
+  public PropertyData getPropertyMapping(String name) {
+    return propertyMappings.get(name);
+  }
+
+  public String getIdName() {
+    return idName;
+  }  
   
 }

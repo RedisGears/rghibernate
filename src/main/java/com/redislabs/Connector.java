@@ -8,6 +8,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import org.hibernate.Session;
@@ -24,6 +25,7 @@ import gears.GearsFuture;
 import gears.LogLevel;
 import gears.operations.AccumulateOperation;
 import gears.operations.ForeachOperation;
+import gears.operations.MapOperation;
 import gears.operations.OnRegisteredOperation;
 import gears.operations.OnUnregisteredOperation;
 import gears.readers.StreamReader;
@@ -33,7 +35,12 @@ import oracle.ucp.common.waitfreepool.Tuple;
 public class Connector implements ForeachOperation<ArrayList<HashMap<String,Object>>>,
 AccumulateOperation<HashMap<String,Object>, ArrayList<HashMap<String, Object>>>,
 OnRegisteredOperation,
-OnUnregisteredOperation, Iterable<String>{
+OnUnregisteredOperation, Iterable<String>,
+MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
+  
+  public static final String ENTETY_NAME_STR = "__entityName__";
+  public static final String EVENT_STR = "__event__";
+  public static final String SOURCE_STR = "__source__";
   
   class MyStandardServiceInitiator implements StandardServiceInitiator<Service>{
 
@@ -75,7 +82,7 @@ OnUnregisteredOperation, Iterable<String>{
    */
   private static final long serialVersionUID = 1L;
 
-  public static HashMap<String, Connector> connectors = new HashMap<>();
+  public static Map<String, Connector> connectors = new ConcurrentHashMap<>();
   
   static Collection<Connector> getAllConnectors() {
     return connectors.values();    
@@ -127,7 +134,7 @@ OnUnregisteredOperation, Iterable<String>{
 
     GearsBuilder<HashMap<String,Object>> builder = GearsBuilder.CreateGearsBuilder(streamReader, String.format("%s connector", name));
     
-    builder.accumulate(this).foreach(this).
+    builder.map(this).accumulate(this).foreach(this).
     map(ArrayList<HashMap<String, Object>>::size).
     register(ExecutionMode.ASYNC_LOCAL, this, this);
   }
@@ -164,6 +171,47 @@ OnUnregisteredOperation, Iterable<String>{
     a.add(r);
     return a;
   }
+  
+  @Override
+  public HashMap<String, Object> map(HashMap<String, Object> r) throws Exception {
+    Map<String, byte[]> value = (Map<String, byte[]>) r.get("value");
+    Map<String, String> map = value.entrySet().stream()
+        .collect(Collectors.toMap(Map.Entry::getKey, e -> new String(e.getValue())));
+    
+    String sourceName = map.get(SOURCE_STR);
+    
+    Source source = Source.getSource(sourceName);
+    
+    Map<String, Object> newMap = new HashMap<String, Object>();
+    
+    for(String key : map.keySet()) {
+      String val = map.get(key);
+      if(key.equals(ENTETY_NAME_STR) ||
+         key.equals(EVENT_STR) ||
+         key.equals(source.getIdName()) || 
+         key.equals(SOURCE_STR)) {
+        newMap.put(key, val);
+        continue;
+      }
+      PropertyData pm = null;
+      Object convertedVal = null;
+      try {
+        pm = source.getPropertyMapping(key);
+        convertedVal = pm.convert(val);
+      }catch (Exception e) {
+        String msg = String.format("Can not find property mapping for %s val %s, error='%s'", key, val, e.toString());
+        GearsBuilder.log(msg, LogLevel.WARNING);
+        throw new Exception(msg);
+      }
+      
+      
+      newMap.put(key, convertedVal);
+    }
+    
+    r.put("value", newMap);
+    
+    return r;
+  }
 
   @Override
   public void foreach(ArrayList<HashMap<String, Object>> record) throws Exception {
@@ -176,12 +224,10 @@ OnUnregisteredOperation, Iterable<String>{
         
         for(Map<String, Object> r: record) {
           lastStreamId = new String((byte[])r.get("id"));
-          Map<String, byte[]> value = (Map<String, byte[]>) r.get("value");
-  
-          Map<String, String> map = value.entrySet().stream()
-              .collect(Collectors.toMap(Map.Entry::getKey, e -> new String(e.getValue())));
+          Map<String, Object> map = (Map<String, Object>) r.get("value");
+          String sourceName = (String)map.remove(SOURCE_STR);
           
-          String event = map.remove("event");
+          String event = (String)map.remove(EVENT_STR);
           if(event.charAt(0) != 'd') {
             if(!isMerge) {
               transaction.commit();
@@ -189,7 +235,7 @@ OnUnregisteredOperation, Iterable<String>{
               transaction = session.beginTransaction();
               isMerge = true;
             }
-            session.merge(map.remove("entityName"), map);
+            session.persist((String)map.remove(ENTETY_NAME_STR), map);
           }else {
             if(isMerge) {
               transaction.commit();
@@ -197,7 +243,9 @@ OnUnregisteredOperation, Iterable<String>{
               transaction = session.beginTransaction();
               isMerge = false;
             }
-            session.delete(map.remove("entityName"), map);
+            Source source = Source.getSource(sourceName);
+            Object o = session.get((String)map.remove(ENTETY_NAME_STR), (Serializable)map.get(source.getIdName()));
+            session.delete(o);
           }
         }
         
