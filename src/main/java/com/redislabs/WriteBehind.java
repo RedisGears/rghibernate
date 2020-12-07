@@ -55,6 +55,32 @@ public class WriteBehind{
       return "OK";
     }).register(ExecutionMode.SYNC);
     
+    // remove source
+    CommandReader newRemoveSourceReader = new CommandReader().setTrigger("SYNC.UNREGISTERSOURCE");
+    GearsBuilder.CreateGearsBuilder(newRemoveSourceReader, "Unregiste source").
+    map(r->{
+      String sourceName = new String((byte[])r[1]);
+      Source s = Source.getSource(sourceName);
+      if(s == null) {
+        throw new Exception("source does exists");
+      }
+      s.unregister();
+      return "OK";
+    }).register(ExecutionMode.SYNC);
+    
+    // remove connector
+    CommandReader newRemoveConnectorReader = new CommandReader().setTrigger("SYNC.UNREGISTERCONNECTOR");
+    GearsBuilder.CreateGearsBuilder(newRemoveConnectorReader, "Unregiste connector").
+    map(r->{
+      String connectorName = new String((byte[])r[1]);
+      Connector c = Connector.GetConnector(connectorName);
+      if(c == null) {
+        throw new Exception("connector does exists");
+      }
+      c.unregister();
+      return "OK";
+    }).register(ExecutionMode.SYNC);
+    
     // dump connectors
     CommandReader dumpConnectorsReader = new CommandReader().setTrigger("SYNC.DUMPCONNECTORS");
     GearsBuilder.CreateGearsBuilder(dumpConnectorsReader, "Dump connectors").

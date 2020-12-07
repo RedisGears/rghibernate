@@ -117,6 +117,17 @@ public class RGHibernate implements Closeable, Serializable {
       CloseSession();
     }
   }
+  
+  public void RemoveSource(String sourceName) {
+    sources.remove(sourceName);
+    synchronized (this) {
+      CloseSession();
+    }
+  }
+  
+  public int NumSources() {
+    return sources.size();
+  }
 
   public Session getSession() {
     if(session == null) {

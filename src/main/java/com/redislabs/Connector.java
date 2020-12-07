@@ -100,6 +100,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
   private String driverClass;
   private String userName;
   private String dialect;
+  private String registrationId;
   private transient RGHibernate connector;
   
   public Connector() {}
@@ -147,14 +148,20 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
   @Override
   public void onUnregistered() throws Exception {
     connector.close();
+    connectors.remove(this.name);
   }
   
   public void addSource(Source s) {
     connector.AddSource(s.getName(), s.getXmlDef());
   }
+  
+  public void removeSource(Source s) {
+    connector.RemoveSource(s.getName());
+  }
 
   @Override
-  public void onRegistered() throws Exception {
+  public void onRegistered(String registrationId) throws Exception {
+    this.registrationId = registrationId;
     connector = RGHibernate.getOrCreate(this.name);
     connector.setXmlConf(this.xmlDef);
     connectors.put(this.name, this);
@@ -309,6 +316,13 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     s.add("dialect");
     s.add(dialect);
     return s.iterator();
+  }
+  
+  public void unregister() throws Exception {
+    if(connector.NumSources() > 0) {
+      throw new Exception("Can't unregister connector with sources");
+    }
+    GearsBuilder.execute("RG.UNREGISTER", registrationId);
   }
 
 }

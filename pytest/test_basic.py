@@ -74,7 +74,7 @@ class genericTest:
 
         self.dbConn = GetConnection()
 
-        self.env = Env(module='../bin/RedisGears/redisgears.so', moduleArgs='CreateVenv 1 pythonInstallationDir ../../bin/RedisGears/ PluginsDirectory ../../bin/RedisGears_JVMPlugin/plugin/ JvmOptions -Djava.class.path=../../bin/RedisGears_JVMPlugin/gears_runtime/target/gear_runtime-jar-with-dependencies.jar JvmPath ../../bin/RedisGears_JVMPlugin/bin/OpenJDK/jdk-11.0.9.1+1/')
+        self.env = Env(module='../bin/RedisGears/redisgears.so', moduleArgs='CreateVenv 1 pythonInstallationDir ../../bin/RedisGears/ Plugin ../../bin/RedisGears_JVMPlugin/plugin/gears_jvm.so JvmOptions -Djava.class.path=../../bin/RedisGears_JVMPlugin/gears_runtime/target/gear_runtime-jar-with-dependencies.jar JvmPath ../../bin/RedisGears_JVMPlugin/bin/OpenJDK/jdk-11.0.9.1+1/')
         with open('../target/rghibernate-jar-with-dependencies.jar', 'rb') as f:
             self.env.cmd('RG.JEXECUTE', 'com.redislabs.WriteBehind', f.read())
 
@@ -352,3 +352,51 @@ class testWriteThrough(genericTest):
             self.env.assertTrue(False, message='got results when expecting no results')
         except Exception:
             pass
+
+    def reloadingIterator(self):
+        yield 1
+        self.env.cmd('save')
+        self.env.stop()
+        self.env.start()
+        yield 2
+
+    def testUnregisterSourceAndConnector(self):
+        self.env.cmd('RG.TRIGGER', 'SYNC.UNREGISTERSOURCE', 'students_src')
+        self.env.cmd('RG.TRIGGER', 'SYNC.UNREGISTERCONNECTOR', 'oracle_connector')
+
+        for _ in self.reloadingIterator():
+            self.env.cmd('hset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10')
+
+            result = self.dbConn.execute(text('select * from student'))
+            try:
+                result.next()
+                self.env.assertTrue(False, message='got results when expecting no results')
+            except Exception:
+                pass
+
+        # register oracle_connector
+        with open('../src/test/resources/hibernate.cfg.xml', 'rt') as f:
+            try:
+                self.env.cmd('RG.TRIGGER', 'SYNC.REGISTERCONNECTOR', 'oracle_connector', '10', '10', '5', f.read())
+            except Exception as e:
+                print(e)
+                input('stopped')
+
+        # reregister student source
+        with open('../src/test/resources/Student.hbm.xml', 'rt') as f:
+            try:
+                self.env.cmd('RG.TRIGGER', 'SYNC.REGISTERSOURCE', 'students_src', 'oracle_connector', 'WriteThrough', f.read())
+            except Exception as e:
+                print(e)
+                input('stopped')
+
+        for _ in self.reloadingIterator():
+            self.env.cmd('hset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '11')
+
+            result = self.dbConn.execute(text('select * from student'))
+            res = result.next()
+
+            self.env.assertEqual(res, (1, 'foo', 'bar', 'email', 11))
+
+    def testUnregisterConnectorWithSources(self):
+        self.env.expect('RG.TRIGGER', 'SYNC.UNREGISTERCONNECTOR', 'oracle_connector').error().contains('Can\'t unregister connector with sources')

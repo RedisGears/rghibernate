@@ -50,6 +50,7 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
   private String connector;
   private String xmlDef;
   private String streamName;
+  private String registrationId;
   private PropertyData idProperty;  
   private HashMap<String, PropertyData> propertyMappings;
   private boolean writeThrough;
@@ -106,8 +107,7 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
         setEventTypes(new String[] {"hset", "hmset", "hincrbyfloat", "hincrby", "hdel", "del", "changed"});
         
     GearsBuilder<KeysReaderRecord> builder = GearsBuilder.CreateGearsBuilder(reader, "keys reader for source " + this.name);
-    builder.foreach(this).
-    register(ExecutionMode.SYNC, this, this);
+    builder.foreach(this).register(ExecutionMode.SYNC, this, this);
     
     sources.put(name, this);
     
@@ -184,37 +184,37 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
       CommandOverrider hsetco = new CommandOverrider().setCommand("hset");
       GearsBuilder.CreateGearsBuilder(hsetco, "hset command override").
       asyncMap(asyncMapper).register(ExecutionMode.ASYNC_LOCAL, 
-          ()->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
+          (id)->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
       
       CommandOverrider delco = new CommandOverrider().setCommand("del");
       GearsBuilder.CreateGearsBuilder(delco, "del command override").
       asyncMap(asyncMapper).register(ExecutionMode.ASYNC_LOCAL, 
-          ()->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
+          (id)->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
       
       CommandOverrider hmsetco = new CommandOverrider().setCommand("hmset");
       GearsBuilder.CreateGearsBuilder(hmsetco, "hmsetco command override").
       asyncMap(asyncMapper).register(ExecutionMode.ASYNC_LOCAL, 
-          ()->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
+          (id)->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
       
       CommandOverrider hincrbyfloatco = new CommandOverrider().setCommand("hincrbyfloat");
       GearsBuilder.CreateGearsBuilder(hincrbyfloatco, "hmsetco command override").
       asyncMap(asyncMapper).register(ExecutionMode.ASYNC_LOCAL, 
-          ()->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
+          (id)->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
       
       CommandOverrider hincrbyco = new CommandOverrider().setCommand("hincrby");
       GearsBuilder.CreateGearsBuilder(hincrbyco, "hmsetco command override").
       asyncMap(asyncMapper).register(ExecutionMode.ASYNC_LOCAL, 
-          ()->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
+          (id)->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
       
       CommandOverrider hdelco = new CommandOverrider().setCommand("hdel");
       GearsBuilder.CreateGearsBuilder(hdelco, "hmsetco command override").
       asyncMap(asyncMapper).register(ExecutionMode.ASYNC_LOCAL, 
-          ()->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
+          (id)->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
       
       CommandOverrider hsetnxco = new CommandOverrider().setCommand("hsetnx");
       GearsBuilder.CreateGearsBuilder(hsetnxco, "hmsetco command override").
       asyncMap(asyncMapper).register(ExecutionMode.ASYNC_LOCAL, 
-          ()->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
+          (id)->{writeThroughIsRegistered=true;}, ()->{writeThroughIsRegistered=false;});
     }
     
   }
@@ -321,12 +321,14 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
 
   @Override
   public void onUnregistered() throws Exception {
-    // TODO Auto-generated method stub
-    
+    Connector c = Connector.GetConnector(connector);
+    c.removeSource(this);
+    sources.remove(name);
   }
 
   @Override
-  public void onRegistered() throws Exception {
+  public void onRegistered(String registrationId) throws Exception {
+    this.registrationId = registrationId;
     RGHibernate.getOrCreate(this.connector).AddSource(this.name, this.xmlDef);
     sources.put(this.name, this);
     System.setProperty("javax.xml.bind.JAXBContextFactory", "org.eclipse.persistence.jaxb.JAXBContextFactory");
@@ -360,6 +362,10 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
 
   public PropertyData getIdProperty() {
     return idProperty;
-  }  
+  }
+  
+  public void unregister() {
+    GearsBuilder.execute("RG.UNREGISTER", registrationId);
+  }
   
 }
