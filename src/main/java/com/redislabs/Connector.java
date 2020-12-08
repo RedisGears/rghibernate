@@ -285,7 +285,6 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
           String s = t.get1();
           GearsFuture<Serializable> f = t.get2();
           
-          GearsBuilder.log(String.format("'%s'.compareTo('%s') = %d", lastStreamId, s, lastStreamId.compareTo(s)));
           if(lastStreamId.compareTo(s) >= 0) {
             f.setResult(s);
             Source.queue.remove();

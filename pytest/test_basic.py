@@ -85,6 +85,16 @@ class genericTest:
             self.env.cmd('RG.TRIGGER', 'SYNC.REGISTERSOURCE', 'students_src', 'oracle_connector', writePolicy, f.read())
 
     def setUp(self):
+        # verify all executions are done
+        done = False
+        while not done:
+            executions = self.env.cmd('RG.DUMPEXECUTIONS')
+            done = True
+            for r in executions:
+                if r[3] != b'done':
+                    done = False
+                    time.sleep(0.1)
+                    break
         try:
             self.dbConn.execute(text('delete from student'))
         except Exception:
