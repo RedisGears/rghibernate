@@ -1,11 +1,18 @@
 package com.redislabs;
 
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+
 import gears.ExecutionMode;
 import gears.GearsBuilder;
+import gears.GearsFuture;
 import gears.readers.CommandReader;
 import gears.readers.KeysReader;
 import gears.readers.StreamReader;
 import gears.readers.StreamReader.FailurePolicy;
+import oracle.ucp.common.waitfreepool.Tuple;
 
 public class WriteBehind{
   
@@ -93,6 +100,35 @@ public class WriteBehind{
     GearsBuilder.CreateGearsBuilder(dumpSourcesReader, "Dump sources").
     flatMap(r->{
       return Source.getAllSources();
+    }).register(ExecutionMode.SYNC);
+    
+    // general information
+    CommandReader syncInfoReader = new CommandReader().setTrigger("SYNC.INFO");
+    GearsBuilder.CreateGearsBuilder(syncInfoReader, "General info about sync").
+    flatMap(r->{
+      String subInfoCommand = null;
+      
+      if(r.length > 1) {
+        subInfoCommand = new String((byte[])r[1]);
+      }
+      
+      if("PendingIds".equals(subInfoCommand)) {
+        List<String> res = new ArrayList<>();
+        for(Tuple<String, GearsFuture<Serializable>> t : Source.queue) {
+          res.add(t.get1());
+        }
+        return res;
+      }
+      
+      if(subInfoCommand != null) {
+        throw new Exception("Subinfo command not exists");
+      }
+      
+      LinkedList<String> res = new LinkedList<>();
+      res.push("PendingFutureObjects");
+      res.push(Integer.toString(Source.queue.size()));
+      return res;
+      
     }).register(ExecutionMode.SYNC);
 
   }
