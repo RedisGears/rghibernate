@@ -26,7 +26,7 @@ jobs:
             command: |
               virtualenv --python=/usr/bin/python3 ./
               source ./bin/activate
-              python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master docker sqlalchemy cx_Oracle cx-oracle
+              python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master docker sqlalchemy cx_Oracle cx-oracle==8.0.1
               make tests
 
 on-any-branch: &on-any-branch
