@@ -19,6 +19,8 @@ import org.hibernate.mapping.Column;
 import org.hibernate.mapping.PersistentClass;
 import org.hibernate.mapping.Property;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import gears.ExecutionMode;
 import gears.GearsBuilder;
 import gears.GearsFuture;
@@ -33,6 +35,12 @@ import gears.readers.KeysReader;
 import gears.records.KeysReaderRecord;
 import oracle.ucp.common.waitfreepool.Tuple;
 
+
+//Object pendingsWrites = GearsBuilder.execute("xlen", String.format("%s-{%s}", streamName, GearsBuilder.hashtag()));
+//s.add("PendingWrites");
+//s.add(pendingsWrites.toString());
+
+
 public class Source implements ForeachOperation<KeysReaderRecord>,
   OnRegisteredOperation,
   OnUnregisteredOperation,
@@ -46,13 +54,19 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
    * 
    */
   private static final long serialVersionUID = 1L;
+  private String hashPrefix;
   private String name;
   private String connector;
   private String xmlDef;
   private String streamName;
   private String registrationId;
-  private PropertyData idProperty;  
+  
+  @JsonIgnore
+  private PropertyData idProperty;
+  
+  @JsonIgnore
   private HashMap<String, PropertyData> propertyMappings;
+  
   private boolean writeThrough;
   
   private static ThreadLocal<List<GearsFuture<Serializable>>> threadLocal = new ThreadLocal<>();;
@@ -66,6 +80,8 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
   public static Collection<Source> getAllSources() {
     return sources.values();    
   }
+  
+  public Source() {}
   
   public Source(String name, String connector, String xmlDef, boolean writeThrough) {
     this.name = name;
@@ -86,7 +102,7 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
     tempSources.addURL(InMemoryURLFactory.getInstance().build("mapping", xmlDef));
     Metadata metadata = tempSources.getMetadataBuilder().build();
     PersistentClass pc = metadata.getEntityBindings().iterator().next();
-    String enteryName = pc.getEntityName();
+    hashPrefix = pc.getEntityName();
     Property idProp = pc.getIdentifierProperty();
     idProperty =  new PropertyData(idProp.getName(), 
         ((Column)idProp.getColumnIterator().next()).getName(), 
@@ -103,7 +119,7 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
     tempRegistry.close();
    
     KeysReader reader = new KeysReader().
-        setPattern(enteryName + ":*").
+        setPattern(hashPrefix + ":*").
         setEventTypes(new String[] {"hset", "hmset", "hincrbyfloat", "hincrby", "hdel", "del", "changed"});
         
     GearsBuilder<KeysReaderRecord> builder = GearsBuilder.CreateGearsBuilder(reader, "keys reader for source " + this.name);
@@ -344,6 +360,8 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
     List<Object> s = new ArrayList<>();
     s.add("name");
     s.add(name);
+    s.add("hashPrefix");
+    s.add(hashPrefix);
     s.add("connector");
     s.add(connector);
     s.add("idProperty");
@@ -367,5 +385,60 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
   public void unregister() {
     GearsBuilder.execute("RG.UNREGISTER", registrationId);
   }
-  
+
+  public String getStreamName() {
+    return streamName;
+  }
+
+  public String getRegistrationId() {
+    return registrationId;
+  }
+
+  public HashMap<String, PropertyData> getPropertyMappings() {
+    return propertyMappings;
+  }
+
+  public boolean isWriteThrough() {
+    return writeThrough;
+  }
+
+  public String getHashPrefix() {
+    return hashPrefix;
+  }
+
+  public void setHashPrefix(String hashPrefix) {
+    this.hashPrefix = hashPrefix;
+  }
+
+  public void setName(String name) {
+    this.name = name;
+  }
+
+  public void setConnector(String connector) {
+    this.connector = connector;
+  }
+
+  public void setXmlDef(String xmlDef) {
+    this.xmlDef = xmlDef;
+  }
+
+  public void setStreamName(String streamName) {
+    this.streamName = streamName;
+  }
+
+  public void setRegistrationId(String registrationId) {
+    this.registrationId = registrationId;
+  }
+
+  public void setIdProperty(PropertyData idProperty) {
+    this.idProperty = idProperty;
+  }
+
+  public void setPropertyMappings(HashMap<String, PropertyData> propertyMappings) {
+    this.propertyMappings = propertyMappings;
+  }
+
+  public void setWriteThrough(boolean writeThrough) {
+    this.writeThrough = writeThrough;
+  }
 }

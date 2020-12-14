@@ -18,6 +18,8 @@ public class PropertyData implements Serializable{
   private AbstractStandardBasicType<?> adType;
   private boolean isId;
   
+  public PropertyData() {}
+  
   public PropertyData(String name, String columnName, Type type, boolean isNullable, boolean isId) {
       this.name = name;
       this.type = type;
@@ -62,7 +64,25 @@ public class PropertyData implements Serializable{
   public String toString() {
     return String.format("%s -> %s (type: %s, mandatory: %b, isId: %b)", getName(), getColumnName(), getType(), !isNullable(), isId());
   }
-  
-  
-  
+
+  public void setName(String name) {
+    this.name = name;
+  }
+
+  public void setColumnName(String columnName) {
+    this.columnName = columnName;
+  }
+
+  public void setNullable(boolean isNullable) {
+    this.isNullable = isNullable;
+  }
+
+  public void setType(Type type) {
+    this.type = type;
+  }
+
+  public void setId(boolean isId) {
+    this.isId = isId;
+  } 
+ 
 }

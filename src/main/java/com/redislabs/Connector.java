@@ -18,7 +18,6 @@ import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.boot.registry.internal.StandardServiceRegistryImpl;
 import org.hibernate.service.Service;
 import org.hibernate.service.spi.ServiceRegistryImplementor;
-import org.hibernate.tuple.IdentifierProperty;
 
 import gears.ExecutionMode;
 import gears.GearsBuilder;
@@ -102,6 +101,9 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
   private String dialect;
   private String registrationId;
   private transient RGHibernate connector;
+  private int batchSize;
+  private int duration;
+  private int retryInterval;
   
   public Connector() {}
   
@@ -122,6 +124,9 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     this.driverClass = initiator.getDriverClass();
     this.userName = initiator.getUser();
     this.dialect = initiator.getDialect();
+    this.batchSize = batchSize;
+    this.duration = duration;
+    this.retryInterval = retryInterval;
     
     tempRegistry.close();
     
@@ -319,10 +324,95 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
   }
   
   public void unregister() throws Exception {
-    if(connector.NumSources() > 0) {
+    if(connector != null && connector.NumSources() > 0) {
       throw new Exception("Can't unregister connector with sources");
     }
     GearsBuilder.execute("RG.UNREGISTER", registrationId);
   }
 
+  public String getName() {
+    return name;
+  }
+
+  public String getXmlDef() {
+    return xmlDef;
+  }
+
+  public String getUrl() {
+    return url;
+  }
+
+  public String getDriverClass() {
+    return driverClass;
+  }
+
+  public String getUserName() {
+    return userName;
+  }
+
+  public String getDialect() {
+    return dialect;
+  }
+
+  public String getRegistrationId() {
+    return registrationId;
+  }
+
+  public int getBatchSize() {
+    return batchSize;
+  }
+
+  public int getDuration() {
+    return duration;
+  }
+
+  public int getRetryInterval() {
+    return retryInterval;
+  }
+
+  public void setName(String name) {
+    this.name = name;
+  }
+
+  public void setUuid(String uuid) {
+    this.uuid = uuid;
+  }
+
+  public void setXmlDef(String xmlDef) {
+    this.xmlDef = xmlDef;
+  }
+
+  public void setUrl(String url) {
+    this.url = url;
+  }
+
+  public void setDriverClass(String driverClass) {
+    this.driverClass = driverClass;
+  }
+
+  public void setUserName(String userName) {
+    this.userName = userName;
+  }
+
+  public void setDialect(String dialect) {
+    this.dialect = dialect;
+  }
+
+  public void setRegistrationId(String registrationId) {
+    this.registrationId = registrationId;
+  }
+
+  public void setBatchSize(int batchSize) {
+    this.batchSize = batchSize;
+  }
+
+  public void setDuration(int duration) {
+    this.duration = duration;
+  }
+
+  public void setRetryInterval(int retryInterval) {
+    this.retryInterval = retryInterval;
+  }
+  
+  
 }
