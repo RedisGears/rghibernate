@@ -120,7 +120,7 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
    
     KeysReader reader = new KeysReader().
         setPattern(hashPrefix + ":*").
-        setEventTypes(new String[] {"hset", "hmset", "hincrbyfloat", "hincrby", "hdel", "del", "changed"});
+        setEventTypes(new String[] {"hset", "hmset", "hincrbyfloat", "hincrby", "hdel", "del", "change"});
         
     GearsBuilder<KeysReaderRecord> builder = GearsBuilder.CreateGearsBuilder(reader, "keys reader for source " + this.name);
     builder.foreach(this).register(ExecutionMode.SYNC, this, this);
