@@ -28,6 +28,20 @@ jobs:
               source ./bin/activate
               python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master docker sqlalchemy cx_Oracle cx-oracle==8.0.1
               make tests
+        - persist_to_workspace:
+            root: target
+            paths:
+              - 'rghibernate-jar-with-dependencies.jar'
+  deploy_snapshots:
+      docker:
+        - image: redisfab/rmbuilder:6.0.9-x64-buster
+      steps:
+        - attach_workspace:
+            at: target
+        - run:
+            name: Deploy Snapshots to S3
+            command: |
+              aws s3 cp target/rghibernate-jar-with-dependencies.jar s3://redismodules/rghibernate/snapshots/ --acl public-read
 
 on-any-branch: &on-any-branch
   filters:
@@ -39,7 +53,9 @@ on-any-branch: &on-any-branch
 on-master: &on-master
   filters:
     branches:
-      only: master
+      only:
+        - master
+        - write_through_support
 
 after-build-and-test: &after-build-and-test
   requires:
@@ -51,6 +67,9 @@ workflows:
     jobs:
       - build-and-test-ubuntu:
           <<: *on-any-branch
+      - deploy_snapshots:
+          <<: *after-build-and-test
+          <<: *on-master
 
   nightly:
       triggers:
