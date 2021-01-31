@@ -66,11 +66,16 @@ def GetConnection():
             time.sleep(1)
 
 class genericTest:
-    def __init__(self, writePolicy):
+    def __init__(self, writePolicy, retryInterval=5, timeout=10):
         
         self.client = docker.from_env()
         self.container = self.getDockerContainer()
         self.network = [n for n in self.client.networks.list() if n.name == 'bridge'][0]
+        try:
+            # in case a test stop in the middle after disconnect the network
+            self.connectDockerToNetwork()
+        except Exception:
+            pass
 
         self.dbConn = GetConnection()
 
@@ -79,10 +84,14 @@ class genericTest:
             self.env.cmd('RG.JEXECUTE', 'com.redislabs.WriteBehind', f.read())
 
         with open('../src/test/resources/hibernate.cfg.xml', 'rt') as f:
-            self.env.cmd('RG.TRIGGER', 'SYNC.REGISTERCONNECTOR', 'oracle_connector', '10', '10', '5', f.read())
+            self.env.cmd('RG.TRIGGER', 'SYNC.REGISTERCONNECTOR', 'oracle_connector', '10', '10', str(retryInterval), f.read())
 
         with open('../src/test/resources/Student.hbm.xml', 'rt') as f:
-            self.env.cmd('RG.TRIGGER', 'SYNC.REGISTERSOURCE', 'students_src', 'oracle_connector', writePolicy, f.read())
+            cmd = ['RG.TRIGGER', 'SYNC.REGISTERSOURCE', 'students_src', 'oracle_connector', writePolicy]
+            if writePolicy == 'WriteThrough':
+                cmd += [str(timeout)]
+            cmd += [f.read()]
+            self.env.cmd(*cmd)
 
     def setUp(self):
         # verify all executions are done
@@ -204,6 +213,20 @@ class testWriteBehind(genericTest):
                 except Exception as e:
                     pass
         self.env.assertEqual(res, (100,))
+
+class testWriteThroughTimeout(genericTest):
+
+    def __init__(self):
+        genericTest.__init__(self, 'WriteThrough', retryInterval=1, timeout=1)
+
+    def testWriteThroughTimeout(self):
+        self.disconnectDockerFromNetwork()
+        with TimeLimit(4, self.env, 'Failed waiting for timeout response'):
+            self.env.expect('hset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10').error().contains('Write Timed out')
+        self.connectDockerToNetwork()
+
+    def testWriteThroughWithoutTimeout(self):
+        self.env.expect('RG.TRIGGER', 'SYNC.REGISTERSOURCE', 'students_src', 'oracle_connector', 'WriteThrough', 'bad timeout', 'xml').error().contains('Could not parse timeout argument')
 
 class testWriteThrough(genericTest):
 
@@ -395,7 +418,7 @@ class testWriteThrough(genericTest):
         # reregister student source
         with open('../src/test/resources/Student.hbm.xml', 'rt') as f:
             try:
-                self.env.cmd('RG.TRIGGER', 'SYNC.REGISTERSOURCE', 'students_src', 'oracle_connector', 'WriteThrough', f.read())
+                self.env.cmd('RG.TRIGGER', 'SYNC.REGISTERSOURCE', 'students_src', 'oracle_connector', 'WriteThrough', '10', f.read())
             except Exception as e:
                 print(e)
                 input('stopped')

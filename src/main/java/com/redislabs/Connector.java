@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.stream.Collectors;
 
 import org.hibernate.Session;
@@ -105,6 +106,8 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
   private int duration;
   private int retryInterval;
   
+  public transient ConcurrentLinkedDeque<WriteThroughMD> queue = null;
+  
   public Connector() {}
   
   public Connector(String name, String xmlDef, int batchSize, int duration, int retryInterval) {
@@ -166,6 +169,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
 
   @Override
   public void onRegistered(String registrationId) throws Exception {
+    queue = new ConcurrentLinkedDeque<>();
     this.registrationId = registrationId;
     connector = RGHibernate.getOrCreate(this.name);
     connector.setXmlConf(this.xmlDef);
@@ -239,6 +243,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
   @Override
   public void foreach(ArrayList<HashMap<String, Object>> record) throws Exception {
     String lastStreamId = null;
+    String msg = null;
     synchronized (this.connector) {
       try {
         Session session = connector.getSession();
@@ -278,25 +283,24 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
         transaction.commit();
         session.clear();
       }catch (Exception e) {
-        String msg = String.format("Failed commiting transaction error='%s'", e.toString());
+        msg = String.format("Failed commiting transaction error='%s'", e.toString());
         GearsBuilder.log(msg, LogLevel.WARNING);
         connector.CloseSession();
-        throw new Exception(msg);
+        lastStreamId = null;
       }
       
-      if(lastStreamId != null) {
-        while(!Source.queue.isEmpty()) {
-          Tuple<String, GearsFuture<Serializable>> t = Source.queue.peek();
-          String s = t.get1();
-          GearsFuture<Serializable> f = t.get2();
-          
-          if(lastStreamId.compareTo(s) >= 0) {
-            f.setResult(s);
-            Source.queue.remove();
-            continue;
-          }
-          break;
+      while(!queue.isEmpty()) {
+        WriteThroughMD wtMD = queue.peek();
+        
+        if(wtMD.TryFree(lastStreamId)) {
+          queue.remove();
+          continue;
         }
+        break;
+      }
+      
+      if(msg != null) {
+        throw new Exception(msg);
       }
     }
     

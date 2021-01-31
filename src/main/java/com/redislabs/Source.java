@@ -45,8 +45,7 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
   OnRegisteredOperation,
   OnUnregisteredOperation,
   Iterable<Object>{
-
-  public static ConcurrentLinkedDeque<Tuple<String, GearsFuture<Serializable>>> queue = new ConcurrentLinkedDeque<>();  
+  
   private static boolean writeThroughIsRegistered = false;
   
   
@@ -60,6 +59,7 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
   private String xmlDef;
   private String streamName;
   private String registrationId;
+  private int timeout;
   
   @JsonIgnore
   private PropertyData idProperty;
@@ -83,12 +83,13 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
   
   public Source() {}
   
-  public Source(String name, String connector, String xmlDef, boolean writeThrough) {
+  public Source(String name, String connector, String xmlDef, boolean writeThrough, int timeout) {
     this.name = name;
     this.connector = connector;
     this.xmlDef = xmlDef;
     this.propertyMappings = new HashMap<String, PropertyData>();
     this.writeThrough = writeThrough;
+    this.timeout = timeout;
     
     Connector c = Connector.GetConnector(connector);
     
@@ -330,8 +331,9 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
       }
       GearsFuture<Serializable> f = new GearsFuture<Serializable>();
       l.add(f);
-      Tuple<String, GearsFuture<Serializable>> t = new Tuple<String, GearsFuture<Serializable>>(streamId, f);
-      queue.add(t);
+      WriteThroughMD wtMD = new WriteThroughMD(streamId, f, timeout * 1000);
+      Connector c = Connector.GetConnector(connector);
+      c.queue.add(wtMD);
     } 
   }
 
@@ -370,6 +372,10 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
     s.add(propertyMappings.values());
     s.add("WritePolicy");
     s.add(writeThrough ? "writeThrough" : "writeBehind");
+    if(writeThrough) {
+      s.add("Timeout");
+      s.add(Integer.toString(timeout));
+    }
     
     return s.iterator();
   }
@@ -400,6 +406,14 @@ public class Source implements ForeachOperation<KeysReaderRecord>,
 
   public boolean isWriteThrough() {
     return writeThrough;
+  }
+
+  public int getTimeout() {
+    return timeout;
+  }
+
+  public void setTimeout(int timeout) {
+    this.timeout = timeout;
   }
 
   public String getHashPrefix() {
