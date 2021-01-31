@@ -100,7 +100,7 @@ class genericTest:
             executions = self.env.cmd('RG.DUMPEXECUTIONS')
             done = True
             for r in executions:
-                if r[3] != b'done':
+                if r[3] != b'done' and r[3] != b'aborted':
                     done = False
                     time.sleep(0.1)
                     break
