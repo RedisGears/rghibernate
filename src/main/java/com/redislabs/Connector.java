@@ -101,6 +101,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
   private String userName;
   private String dialect;
   private String registrationId;
+  private String expectedStreamName;
   private transient RGHibernate connector;
   private int batchSize;
   private int duration;
@@ -169,6 +170,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
 
   @Override
   public void onRegistered(String registrationId) throws Exception {
+    expectedStreamName = String.format("_Stream-%s-%s-{%s}", name, uuid, GearsBuilder.hashtag());
     queue = new ConcurrentLinkedDeque<>();
     this.registrationId = registrationId;
     connector = RGHibernate.getOrCreate(this.name);
@@ -197,7 +199,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     
     String sourceName = map.get(SOURCE_STR);
     
-    Source source = Source.getSource(sourceName);
+    Source source = (WriteSource)Source.getSource(sourceName);
     
     Map<String, Object> newMap = new HashMap<String, Object>();
     PropertyData idProperty =  source.getIdProperty();
@@ -306,6 +308,23 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     
   }
   
+  public Object getObject(String entetyName, Serializable pk) throws Exception {
+    Object o = null;
+    synchronized (this.connector) {
+      try {
+        Session session = connector.getSession();
+        session.clear();
+        o = session.get(entetyName, pk);
+      }catch(Exception e) {
+        String msg = String.format("Failed fetching data from databse, error='%s'", e.toString());
+        GearsBuilder.log(msg, LogLevel.WARNING);
+        connector.CloseSession();
+        throw e;
+      }
+    }
+    return o;
+  }
+  
   @Override
   public String toString() {
     return String.format("name: %s, xmlDef: %s", this.name, this.xmlDef);
@@ -324,6 +343,23 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     s.add(userName);
     s.add("dialect");
     s.add(dialect);
+    s.add("uuid");
+    s.add(uuid);
+    s.add("registrationId");
+    s.add(registrationId);
+    s.add("batchSize");
+    s.add(Integer.toString(batchSize));
+    s.add("duration");
+    s.add(Integer.toString(duration));
+    s.add("retryInterval");
+    s.add(Integer.toString(retryInterval));
+    s.add("streamName");
+    s.add(expectedStreamName);
+    s.add("pendingClients");
+    s.add(Integer.toString(queue.size()));
+    Long backlog = (Long)GearsBuilder.execute("xlen", expectedStreamName);
+    s.add("backlog");
+    s.add(Long.toString(backlog));
     return s.iterator();
   }
   

@@ -1,18 +1,15 @@
 package com.redislabs;
 
-import java.io.Serializable;
-
-import gears.GearsBuilder;
 import gears.GearsFuture;
 
 public class WriteThroughMD {
   
   private String streamID;
-  private GearsFuture<Serializable> f;
+  private GearsFuture<String> f;
   private long startTime;
   private long timeout;
   
-  public WriteThroughMD(String streamID, GearsFuture<Serializable> f, long timeout) {
+  public WriteThroughMD(String streamID, GearsFuture<String> f, long timeout) {
     this.streamID = streamID;
     this.f = f;
     this.timeout = timeout;
@@ -27,7 +24,7 @@ public class WriteThroughMD {
     
     long currTime = System.currentTimeMillis();
     if (startTime + timeout < currTime) {
-      f.setError("Write Timed out");
+      f.setResult("-ERR Write Timed out");
       return true;
     }
     

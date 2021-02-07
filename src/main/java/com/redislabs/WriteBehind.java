@@ -6,21 +6,16 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 
 import gears.ExecutionMode;
 import gears.GearsBuilder;
-import gears.GearsFuture;
 import gears.operations.FlatMapOperation;
 import gears.readers.CommandReader;
-import oracle.ucp.common.waitfreepool.Tuple;
 
 public class WriteBehind{
   
@@ -90,6 +85,7 @@ public class WriteBehind{
       String updateData = GearsBuilder.getSessionUpgradeData(sessionId);
       GearsBuilder.log(String.format("Got update data from session %s", sessionId));
       ObjectMapper objectMapper = new ObjectMapper();
+      objectMapper.registerSubtypes(ReadSource.class, WriteSource.class);
       updateInfo = objectMapper.readValue(updateData, UpdateInfo.class);
       objectMapper.getTypeFactory().clearCache();
       TypeFactory.defaultInstance().clearCache();
@@ -136,8 +132,10 @@ public class WriteBehind{
       String writePolicy = new String((byte[])r[3]);
       int timeout = 0;
       String sourceXml = null;
-      boolean writeThrough;
+      boolean isWrite = true;
+      boolean writeThrough = false;
       if(writePolicy.equals("WriteThrough")) {
+        isWrite = true;
         writeThrough = true;
         try {
           timeout = Integer.parseInt(new String((byte[])r[4]));
@@ -146,20 +144,34 @@ public class WriteBehind{
         }
         sourceXml = new String((byte[])r[5]);
       }else if(writePolicy.equals("WriteBehind")) {
+        isWrite = true;
         writeThrough = false;
         sourceXml = new String((byte[])r[4]);
-      }else {
-        throw new Exception("Write policy should be either WriteThrough or WriteBehind");
+      }else if(writePolicy.equals("ReadThrough")) {
+        isWrite = false;
+        try {
+          timeout = Integer.parseInt(new String((byte[])r[4]));
+        }catch (Exception e) {
+          throw new Exception("Could not parse expire argument");
+        }
+        sourceXml = new String((byte[])r[5]);
+      } else {
+        throw new Exception("Write policy should be either WriteThrough/WriteBehind/ReadThrough");
       }
       
-      if(Source.getSource(sourceName) != null) {
+      if(WriteSource.getSource(sourceName) != null) {
         throw new Exception("source already exists");
       }
       Connector c = Connector.GetConnector(connectorName);
       if(c == null) {
         throw new Exception("connector does not exists");
       }
-      Source s = new Source(sourceName, connectorName, sourceXml, writeThrough, timeout);
+      Source s = null;
+      if (isWrite) {
+        s = new WriteSource(sourceName, connectorName, sourceXml, writeThrough, timeout);
+      }else {
+        s = new ReadSource(sourceName, connectorName, sourceXml, timeout);
+      }
       c.addSource(s);
       return "OK";
     }).register(ExecutionMode.SYNC);
@@ -169,7 +181,7 @@ public class WriteBehind{
     GearsBuilder.CreateGearsBuilder(newRemoveSourceReader, "Unregiste source").
     map(r->{
       String sourceName = new String((byte[])r[1]);
-      Source s = Source.getSource(sourceName);
+      Source s = WriteSource.getSource(sourceName);
       if(s == null) {
         throw new Exception("source does exists");
       }
@@ -213,7 +225,7 @@ public class WriteBehind{
         }
         
         if("SOURCES".equals(subInfoCommand)) {
-          return Source.getAllSources().stream().map(e->(Serializable)e).collect(Collectors.toList());
+          return WriteSource.getAllSources().stream().map(e->(Serializable)e).collect(Collectors.toList());
         }
         
         if("GENERAL".equals(subInfoCommand)) {
@@ -221,7 +233,8 @@ public class WriteBehind{
           res.push("NConnector");
           res.push(Integer.toString(Connector.getAllConnectors().size()));
           res.push("NSources");
-          res.push(Integer.toString(Source.getAllSources().size()));
+          res.push(Integer.toString(WriteSource.getAllSources().size()));
+          
           return res;
         }
         
@@ -237,8 +250,14 @@ public class WriteBehind{
         new Connector(c.getName(), c.getXmlDef(), c.getBatchSize(), c.getDuration(), c.getRetryInterval());
       }
       
-      for(Source s: updateInfo.getSources()) {
-        new Source(s.getName(), s.getConnector(), s.getXmlDef(), s.isWriteThrough(), s.getTimeout());
+      for(Source temp: updateInfo.getSources()) {
+        if(temp instanceof WriteSource) {
+          WriteSource s = (WriteSource)temp;
+          new WriteSource(s.getName(), s.getConnector(), s.getXmlDef(), s.isWriteThrough(), s.getTimeout());
+        } else if(temp instanceof ReadSource) {
+          ReadSource s = (ReadSource)temp;
+          new ReadSource(s.getName(), s.getConnector(), s.getXmlDef(), s.getExpire());
+        }
       }
     }
   }

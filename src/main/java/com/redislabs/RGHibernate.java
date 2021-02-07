@@ -49,6 +49,8 @@ public class RGHibernate implements Closeable, Serializable {
   private transient Session session = null;
   private transient SessionFactory factory = null;
   private transient StandardServiceRegistry registry = null;
+  
+  private long nextConnetRetry = 0;
 
   public RGHibernate(String name) {
     this.name = name;
@@ -94,6 +96,8 @@ public class RGHibernate implements Closeable, Serializable {
     }
     
     session = null;
+    
+    nextConnetRetry = System.currentTimeMillis() + 5000; // retry each 5 seconds
   }
 
   private void GenerateSession() {
@@ -131,7 +135,17 @@ public class RGHibernate implements Closeable, Serializable {
 
   public Session getSession() {
     if(session == null) {
-      GenerateSession();
+      if(nextConnetRetry > 0) {
+        if(nextConnetRetry > System.currentTimeMillis()) {
+          throw new RuntimeException("Disconnected from database");
+        }
+      }
+      try {
+        GenerateSession();
+        nextConnetRetry = 0;
+      }catch(Exception e) {
+        nextConnetRetry = System.currentTimeMillis() + 5000; // we will retry in 5 seconds.
+      }
     }
     return session;
   }
@@ -178,8 +192,7 @@ public class RGHibernate implements Closeable, Serializable {
 
       }
     } catch (SQLException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
+      GearsBuilder.log(String.format("Exception on deregister drivers, %s", e.toString()));
     }
 
     // Closing timer thread for oracle driver not to leak..
