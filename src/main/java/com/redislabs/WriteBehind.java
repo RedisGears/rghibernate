@@ -67,7 +67,7 @@ public class WriteBehind{
   public static void main(String[] args) throws Exception {
     
     UpdateInfo updateInfo = null;
-    Object[] sessions = (Object[])GearsBuilder.execute("RG.JDUMPSESSIONS");
+    Object[] sessions = (Object[])((Object[])GearsBuilder.execute("RG.JDUMPSESSIONS"))[1];
     List<Object[]> oldVersions = Arrays.stream(sessions).map(s->(Object[])s).
         filter(s->s[3].equals("com.redislabs.WriteBehind") && !s[9].toString().equals("0")).collect(Collectors.toList());
     if(oldVersions.size() > 2) {
