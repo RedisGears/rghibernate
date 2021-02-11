@@ -31,19 +31,34 @@ jobs:
               python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master docker sqlalchemy cx_Oracle cx-oracle==8.0.1
               make tests
         - persist_to_workspace:
-            root: target
+            root: artifacts
             paths:
-              - 'rghibernate-jar-with-dependencies.jar'
+              - 'snapshot/*.jar'
+              - 'release/*.jar'
   deploy_snapshots:
       docker:
         - image: redisfab/rmbuilder:6.0.9-x64-buster
       steps:
         - attach_workspace:
-            at: target
+            at: artifacts
         - run:
             name: Deploy Snapshots to S3
             command: |
-              aws s3 cp target/rghibernate-jar-with-dependencies.jar s3://redismodules/rghibernate/snapshots/ --acl public-read
+              for f in artifacts/snapshot/*.jar; do
+                aws s3 cp $f s3://redismodules/rghibernate/snapshots/ --acl public-read
+              done
+  deploy_release:
+      docker:
+        - image: redisfab/rmbuilder:6.0.9-x64-buster
+      steps:
+        - attach_workspace:
+            at: artifacts
+        - run:
+            name: Deploy Snapshots to S3
+            command: |
+              for f in artifacts/release/*.jar; do
+                aws s3 cp $f s3://redismodules/rghibernate/ --acl public-read
+              done
 
 on-any-branch: &on-any-branch
   filters:
@@ -59,6 +74,13 @@ on-master: &on-master
         - master
         - write_through_support
 
+on-version-tags: &on-version-tags
+  filters:
+    branches:
+      ignore: /.*/
+    tags:
+      only: /^v[0-9].*/
+
 after-build-and-test: &after-build-and-test
   requires:
     - build-and-test-ubuntu
@@ -70,8 +92,13 @@ workflows:
       - build-and-test-ubuntu:
           <<: *on-any-branch
       - deploy_snapshots:
+          context: common
           <<: *after-build-and-test
           <<: *on-master
+      - deploy_release:
+          context: common
+          <<: *after-build-and-test
+          <<: *on-version-tags
 
   nightly:
       triggers:

@@ -19,7 +19,7 @@ import gears.readers.CommandReader;
 
 public class WriteBehind{
   
-  public static int VERSION=2;
+  public static int VERSION=100;
   
   public static class UpdateInfo{
     
@@ -65,6 +65,14 @@ public class WriteBehind{
   }
   
   public static void main(String[] args) throws Exception {
+    
+    if(args.length == 1 && args[0].equals("version")) {
+      int patch = VERSION % 100;
+      int minor = (VERSION / 100) % 100;
+      int major = (VERSION / 10000);
+      System.out.print(String.format("%d.%d.%d\r\n", major, minor, patch));
+      return;
+    }
     
     UpdateInfo updateInfo = null;
     Object[] sessions = (Object[])((Object[])GearsBuilder.execute("RG.JDUMPSESSIONS"))[1];
