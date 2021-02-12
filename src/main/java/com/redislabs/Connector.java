@@ -246,6 +246,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
   public void foreach(ArrayList<HashMap<String, Object>> record) throws Exception {
     String lastStreamId = null;
     String msg = null;
+    Exception cause = null;
     synchronized (this.connector) {
       try {
         Session session = connector.getSession();
@@ -289,6 +290,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
         GearsBuilder.log(msg, LogLevel.WARNING);
         connector.CloseSession();
         lastStreamId = null;
+        cause = e;
       }
       
       while(!queue.isEmpty()) {
@@ -302,7 +304,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
       }
       
       if(msg != null) {
-        throw new Exception(msg);
+        throw new Exception(msg, cause);
       }
     }
     

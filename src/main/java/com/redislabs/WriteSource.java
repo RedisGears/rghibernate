@@ -147,7 +147,8 @@ public class WriteSource extends Source{
     try {
       foreachInternal(record);
     } catch(Exception e) {
-      GearsBuilder.overrideReply(String.format("-Err %s", e.toString()));
+      GearsBuilder.log(String.format("-Err %s", e.toString()));
+      throw e;
     }
   }
   

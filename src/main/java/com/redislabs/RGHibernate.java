@@ -145,6 +145,7 @@ public class RGHibernate implements Closeable, Serializable {
         nextConnetRetry = 0;
       }catch(Exception e) {
         nextConnetRetry = System.currentTimeMillis() + 5000; // we will retry in 5 seconds.
+        throw e;
       }
     }
     return session;
