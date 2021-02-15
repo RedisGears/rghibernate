@@ -113,6 +113,7 @@ The argument after the ReadThrough policy is the expire value, 0 means no expire
 
 And we are done, now every time we write a data to Student:* the data will be replicated to mysql, and each time we will try to read a unexisting key with prefix Student:*, the keys will be fetch from mysql.
 
+
 ### Commands list
 * SYNC.REGISTERCONNECTOR <connector name> <batch size> <timeout> <retry interval> <connector xml>
 Register a new connector
@@ -121,9 +122,11 @@ Register a new connector
     * timeout - after this timeout, even if batch size was not reached, the data will be sent to the backend.
     * retry interval - retry interval on error.
     * connector xml - hibernate xml definition of the connector.
+
 Example:
 ```
-> redis-cli -x --host <host> --port <port> RG.TRIGGER SYNC.REGISTERCONNECTOR <connector name> <batch size> <timeout> <retry interval> < src/tests/resources/hibernate.cfg.xml
+> redis-cli -x --host <host> --port <port> RG.TRIGGER SYNC.REGISTERCONNECTOR mysql 1000 10 5 < src/test/resources/mysql_hibernate.cfg.xml 
+1) "OK"
 ```
 
 * SYNC.UNREGISTERCONNECTOR <connector name>
@@ -136,9 +139,11 @@ Unregister a connector (notice a connector can not be unregistered if it has sou
         * On WriteThroug the extra argument are WriteTimeout
         * On ReadThrough the extra argument are expire (0 for no expire)
     * mapping xml - hibernate xml definition of the mapping
+
 Example:
 ```
-> redis-cli -x --host <host> --port <port> RG.TRIGGER SYNC.REGISTERSOURCE <source name> <connector name> <policy> [extra config based on policy] < src/tests/resources/Student.hbm.xml
+> redis-cli -x --host <host> --port <port> RG.TRIGGER SYNC.REGISTERSOURCE StudentWrite mysql WriteBehind < src/test/resources/Student.hbm.xml 
+1) "OK"
 ```
 
 * SYNC.UNREGISTERSOURCE <source name>
