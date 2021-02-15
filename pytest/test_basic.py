@@ -3,7 +3,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.sql import text
 import time
 import subprocess
-import docker
 import signal
 from threading import Thread
 
@@ -101,6 +100,7 @@ class MysqlBackend:
 
 class OracleBackend:
     def __init__(self):
+        import docker
         self.client = docker.from_env()
         self.container = self.getDockerContainer()
         self.network = [n for n in self.client.networks.list() if n.name == 'bridge'][0]
