@@ -39,6 +39,11 @@ jobs:
     docker:
       - image: 'ubuntu:bionic'
     steps:
+      - run:
+          name: Setup executor
+          command: |
+            apt-get -qq update
+            apt-get -q install -y git openssh-client curl ca-certificates make tar gzip unzip maven
       - checkout
       - run:
           name: Setup automation
