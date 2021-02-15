@@ -55,7 +55,7 @@ jobs:
       - run:
             name: Install Redis
             command: python3 ./deps/readies/bin/getredis --version 6
-        - run:
+      - run:
             name: Install RLTest
             command: python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
       - run:
