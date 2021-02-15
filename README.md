@@ -39,7 +39,12 @@ Read-Through implementation that mainly register on key-miss notification and go
 Execute `make build`, when finished you will find the compile jar `artifacts/release/rghibernate-<version>-jar-with-dependencies.jar`
 
 ### Example
-In this example we will configure a ReadThroug and WriteBehind into a Student database with 4 columns on mysql database. Our connctor xml looks like this:
+First we need to upload the rghibernate jar to RedisGears like this:
+```
+redis-cli -x RG.JEXECUTE com.redislabs.WriteBehind < ./artifacts/release/rghibernate-0.1.1-jar-with-dependencies.jar
+```
+
+In this example we will configure a ReadThroug and WriteBehind into a Student database with 4 columns on mysql database. Our connector xml looks like this:
 ```xml
 <!DOCTYPE hibernate-configuration PUBLIC
         "-//Hibernate/Hibernate Configuration DTD 3.0//EN"
@@ -74,7 +79,7 @@ We will upload our connector like this:
 > redis-cli -x RG.TRIGGER SYNC.REGISTERCONNECTOR mysql 1000 10 5 < src/test/resources/mysql_hibernate.cfg.xml 
 1) "OK"
 ```
-Now we need to upload our mapping xml for WriteBehind (we call it a source that tells mapping how to map hashes into the backend database). Our mapping xml looks like this:
+Now we need to upload our mapping xml for WriteBehind (we call it a source that tells how to map hashes into the backend database). Our mapping xml looks like this:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <hibernate-mapping xmlns="http://www.hibernate.org/xsd/hibernate-mapping"
@@ -111,11 +116,11 @@ And we are done, now every time we write a data to Student:* the data will be re
 ### Commands list
 * SYNC.REGISTERCONNECTOR <connector name> <batch size> <timeout> <retry interval> <connector xml>
 Register a new connector
-  ** connector name - a name you want to give to your connector.
-  ** batch size - the data are sent to the backend in batches, this values allows to set the batch size.
-  ** timeout - after this timeout, even if batch size was not reached, the data will be sent to the backend.
-  ** retry interval - retry interval on error.
-  ** connector xml - hibernate xml definition of the connector.
+    * connector name - a name you want to give to your connector.
+    * batch size - the data are sent to the backend in batches, this values allows to set the batch size.
+    * timeout - after this timeout, even if batch size was not reached, the data will be sent to the backend.
+    * retry interval - retry interval on error.
+    * connector xml - hibernate xml definition of the connector.
 Example:
 ```
 > redis-cli -x --host <host> --port <port> RG.TRIGGER SYNC.REGISTERCONNECTOR <connector name> <batch size> <timeout> <retry interval> < src/tests/resources/hibernate.cfg.xml
@@ -125,12 +130,12 @@ Example:
 Unregister a connector (notice a connector can not be unregistered if it has sources attached to it)
 
 * SYNC.REGISTERSOURCE <source name> <connector name> <policy> [extra config based on policy] <mapping xml>
- ** source name - name you want to give to your source
- ** connector name - connector to send the data to
- ** policy - WriteBehind/WriteThrough/ReadThrough
-    *** On WriteThroug the extra argument are WriteTimeout
-    *** On ReadThrough the extra argument are expire (0 for no expire)
- ** mapping xml - hibernate xml definition of the mapping
+    * source name - name you want to give to your source
+    * connector name - connector to send the data to
+    * policy - WriteBehind/WriteThrough/ReadThrough
+        * On WriteThroug the extra argument are WriteTimeout
+        * On ReadThrough the extra argument are expire (0 for no expire)
+    * mapping xml - hibernate xml definition of the mapping
 Example:
 ```
 > redis-cli -x --host <host> --port <port> RG.TRIGGER SYNC.REGISTERSOURCE <source name> <connector name> <policy> [extra config based on policy] < src/tests/resources/Student.hbm.xml
