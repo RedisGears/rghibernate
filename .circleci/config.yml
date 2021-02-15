@@ -65,7 +65,9 @@ jobs:
             command: python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
       - run:
           name: Test
-          command: make tests
+          command: |
+            python3 -m pip install --no-cache-dir sqlalchemy PyMySQL cryptography
+            make tests
       - persist_to_workspace:
           root: artifacts
           paths:
