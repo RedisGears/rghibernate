@@ -1,40 +1,71 @@
 version: 2.1
 
 jobs:
+  # build-and-test-ubuntu:
+  #     machine:
+  #       enabled: true
+  #       image: ubuntu-1604:201903-01
+  #     steps:
+  #       - run:
+  #           name: Setup executor
+  #           command: |
+  #             sudo apt-get -qq update
+  #             sudo apt-get -q install -y git openssh-client curl ca-certificates make tar gzip python3-dev unzip python-pip maven
+  #       - checkout
+  #       - run:
+  #           name: Checkout submodules
+  #           command: git submodule update --init --recursive        
+  #       - run:
+  #           name: Install Redis
+  #           command: |
+  #             sudo python -m pip install semantic_version
+  #             sudo python ./deps/readies/bin/getredis --version 6
+  #       - run:
+  #           name: Install Oracle client
+  #           command: sudo /bin/bash install_oracle_driver.sh
+  #       - run:
+  #           name: Tests
+  #           command: |
+  #             virtualenv --python=/usr/bin/python3 ./
+  #             source ./bin/activate
+  #             python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master docker sqlalchemy cx_Oracle cx-oracle==8.0.1
+  #             make tests
+  #       - persist_to_workspace:
+  #           root: artifacts
+  #           paths:
+  #             - 'snapshot/*.jar'
+  #             - 'release/*.jar'
   build-and-test-ubuntu:
-      machine:
-        enabled: true
-        image: ubuntu-1604:201903-01
-      steps:
-        - run:
-            name: Setup executor
-            command: |
-              sudo apt-get -qq update
-              sudo apt-get -q install -y git openssh-client curl ca-certificates make tar gzip python3-dev unzip python-pip maven
-        - checkout
-        - run:
-            name: Checkout submodules
-            command: git submodule update --init --recursive        
-        - run:
+    docker:
+      - image: 'ubuntu:bionic'
+    steps:
+      - checkout
+      - run:
+          name: Setup automation
+          command: |
+            git submodule update --init --recursive
+            ./deps/readies/bin/getpy3
+      - run:
+          name: Install and Configure mysql
+          command: |
+            apt-get update
+            apt-get install -y mysql-server
+            service mysql start
+            /bin/bash ./setup-mysql
+      - run:
             name: Install Redis
-            command: |
-              sudo python -m pip install semantic_version
-              sudo python ./deps/readies/bin/getredis --version 6
+            command: python3 ./deps/readies/bin/getredis --version 6
         - run:
-            name: Install Oracle client
-            command: sudo /bin/bash install_oracle_driver.sh
-        - run:
-            name: Tests
-            command: |
-              virtualenv --python=/usr/bin/python3 ./
-              source ./bin/activate
-              python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master docker sqlalchemy cx_Oracle cx-oracle==8.0.1
-              make tests
-        - persist_to_workspace:
-            root: artifacts
-            paths:
-              - 'snapshot/*.jar'
-              - 'release/*.jar'
+            name: Install RLTest
+            command: python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
+      - run:
+          name: Test
+          command: make tests
+      - persist_to_workspace:
+          root: artifacts
+          paths:
+            - 'snapshot/*.jar'
+            - 'release/*.jar'
   deploy_snapshots:
       docker:
         - image: redisfab/rmbuilder:6.0.9-x64-buster

@@ -7,6 +7,9 @@ import docker
 import signal
 from threading import Thread
 
+MYSQL_DB = 1
+ORACLESQL_DB = 2
+
 class Background(object):
     """
     A context manager that fires a TimeExpired exception if it does not
@@ -65,9 +68,39 @@ def GetConnection():
         except Exception as e:
             time.sleep(1)
 
-class genericTest:
-    def __init__(self, writePolicy, retryInterval=5, timeout=10):
-        
+class MysqlBackend:
+    def __init__(self):
+        subprocess.Popen(['/bin/bash', 'service', 'mysql', 'restart'], stdout=subprocess.PIPE).wait()
+
+    def disconnect(self):
+        subprocess.Popen(['/bin/bash', 'service', 'mysql', 'stop'], stdout=subprocess.PIPE).wait()
+
+    def connect(self):
+        subprocess.Popen(['/bin/bash', 'service', 'mysql', 'start'], stdout=subprocess.PIPE).wait()
+
+    def getDBConn(self):
+        return self.GetConnection()
+
+    def getConnectionHibernateFile(self):
+        return '../src/test/resources/mysql_hibernate.cfg.xml'
+
+    def Connect(self):
+        ConnectionStr = 'mysql+pymysql://{user}:{password}@{db}'.format(user='demouser', password='Password123!', db='localhost:3306/test')
+        engine = create_engine(ConnectionStr).execution_options(autocommit=True)
+        conn = engine.connect()
+        return conn
+
+    def GetConnection(self):
+        while True:
+            try:
+                return self.Connect() 
+            except Exception as e:
+                print(e)
+                time.sleep(1)
+
+
+class OracleBackend:
+    def __init__(self):
         self.client = docker.from_env()
         self.container = self.getDockerContainer()
         self.network = [n for n in self.client.networks.list() if n.name == 'bridge'][0]
@@ -77,13 +110,56 @@ class genericTest:
         except Exception:
             pass
 
-        self.dbConn = GetConnection()
+    def getDockerContainer(self):
+        container = [container for container in self.client.containers.list() if container.attrs['Config']['Image'] == 'quay.io/maksymbilenko/oracle-12c']
+        if len(container) == 0:
+            print('Starting oracle container')
+            process = subprocess.Popen(['/bin/bash', '../install_oracle.sh'], stdout=subprocess.PIPE)
+            while len(container) == 0:
+                container = [container for container in self.client.containers.list() if container.attrs['Config']['Image'] == 'quay.io/maksymbilenko/oracle-12c']
+        else:
+            print('Oracle container already running')
+    
+        return container[0]
+
+    def disconnect(self):
+        self.network.disconnect(self.container.attrs['Id'])
+
+    def connect(self):
+        self.network.connect(self.container.attrs['Id'])
+
+    def getDBConn(self):
+        return self.GetConnection()
+
+    def getConnectionHibernateFile(self):
+        return '../src/test/resources/hibernate.cfg.xml'
+
+    def Connect(self):
+        ConnectionStr = 'oracle://{user}:{password}@{db}'.format(user='system', password='oracle', db='localhost:1521/xe')
+        engine = create_engine(ConnectionStr).execution_options(autocommit=True)
+        conn = engine.connect()
+        return conn
+
+    def GetConnection(self):
+        while True:
+            try:
+                return self.Connect() 
+            except Exception as e:
+                time.sleep(1)
+
+
+class genericTest:
+    def __init__(self, writePolicy, retryInterval=5, timeout=10, db=MYSQL_DB):
+        
+        self.backend = OracleBackend() if db == ORACLESQL_DB else MysqlBackend()
+
+        self.dbConn = self.backend.getDBConn()
 
         self.env = Env(module='../bin/RedisGears/redisgears.so', moduleArgs='CreateVenv 1 pythonInstallationDir ../../bin/RedisGears/ Plugin ../../bin/RedisGears_JVMPlugin/plugin/gears_jvm.so JvmOptions -Djava.class.path=../../bin/RedisGears_JVMPlugin/gears_runtime/target/gear_runtime-jar-with-dependencies.jar JvmPath ../../bin/RedisGears_JVMPlugin/bin/OpenJDK/jdk-11.0.9.1+1/')
         with open('../target/rghibernate-jar-with-dependencies.jar', 'rb') as f:
             self.env.cmd('RG.JEXECUTE', 'com.redislabs.WriteBehind', f.read())
 
-        with open('../src/test/resources/hibernate.cfg.xml', 'rt') as f:
+        with open(self.backend.getConnectionHibernateFile(), 'rt') as f:
             self.env.cmd('RG.TRIGGER', 'SYNC.REGISTERCONNECTOR', 'oracle_connector', '10', '10', str(retryInterval), f.read())
 
         with open('../src/test/resources/Student.hbm.xml', 'rt') as f:
@@ -110,23 +186,12 @@ class genericTest:
             pass
         self.env.cmd('flushall')
 
-    def disconnectDockerFromNetwork(self):
-        self.network.disconnect(self.container.attrs['Id'])
+    def disconnectBackend(self):
+        self.backend.disconnect()
 
-    def connectDockerToNetwork(self):
-        self.network.connect(self.container.attrs['Id'])
-
-    def getDockerContainer(self):
-        container = [container for container in self.client.containers.list() if container.attrs['Config']['Image'] == 'quay.io/maksymbilenko/oracle-12c']
-        if len(container) == 0:
-            print('Starting oracle container')
-            process = subprocess.Popen(['/bin/bash', '../install_oracle.sh'], stdout=subprocess.PIPE)
-            while len(container) == 0:
-                container = [container for container in self.client.containers.list() if container.attrs['Config']['Image'] == 'quay.io/maksymbilenko/oracle-12c']
-        else:
-            print('Oracle container already running')
-    
-        return container[0]
+    def connectBackend(self):
+        self.backend.connect()
+        self.dbConn = self.backend.getDBConn()
 
 class testWriteBehind(genericTest):
     def __init__(self):
@@ -195,11 +260,11 @@ class testWriteBehind(genericTest):
         for i in range(100):
             self.env.cmd('hmset', 'Student:%d' % i, 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10')
             if i == 50:
-                self.disconnectDockerFromNetwork()
+                self.disconnectBackend()
         
-        self.connectDockerToNetwork()
+        self.connectBackend()
 
-        self.dbConn = GetConnection()
+        self.dbConn = self.backend.getDBConn()
         
         # make sure all data was written
         result = None
@@ -220,10 +285,10 @@ class testWriteThroughTimeout(genericTest):
         genericTest.__init__(self, 'WriteThrough', retryInterval=1, timeout=1)
 
     def testWriteThroughTimeout(self):
-        self.disconnectDockerFromNetwork()
+        self.disconnectBackend()
         with TimeLimit(4, self.env, 'Failed waiting for timeout response'):
             self.env.expect('hset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10').error().contains('Write Timed out')
-        self.connectDockerToNetwork()
+        self.connectBackend
 
     def testWriteThroughWithoutTimeout(self):
         self.env.expect('RG.TRIGGER', 'SYNC.REGISTERSOURCE', 'students_src', 'oracle_connector', 'WriteThrough', 'bad timeout', 'xml').error().contains('Could not parse timeout argument')
@@ -276,19 +341,27 @@ class testWriteThrough(genericTest):
             for i in range(100):
                 self.env.cmd('hmset', 'Student:%d' % i, 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10')
 
-            self.dbConn = GetConnection()
+            start = time.time()
+            # 10 seconds timeout
+            while (start + 10) < time.time():
+                try:
+                    self.dbConn = GetConnection()
 
-            result = self.dbConn.execute(text('select count(*) from student'))
-            res = result.next()
+                    result = self.dbConn.execute(text('select count(*) from student'))
+                    res = result.next()
 
-            self.env.assertEqual(res, (100,))
+                    self.env.assertEqual(res, (100,))
+
+                    break
+                except Exception:
+                    pass
 
         with TimeLimit(60*5, self.env, 'Failed waiting for data to reach the database'):
             with Background(background):
                 time.sleep(0.5)
-                self.disconnectDockerFromNetwork()
+                self.disconnectBackend()
                 time.sleep(0.5)
-                self.connectDockerToNetwork()
+                self.connectBackend()
 
     def testMandatoryValueMissing(self):
         self.env.expect('hmset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'age', '10').error().contains('mandatory "email" value is not set')
@@ -408,7 +481,7 @@ class testWriteThrough(genericTest):
                 pass
 
         # register oracle_connector
-        with open('../src/test/resources/hibernate.cfg.xml', 'rt') as f:
+        with open(self.backend.getConnectionHibernateFile(), 'rt') as f:
             try:
                 self.env.cmd('RG.TRIGGER', 'SYNC.REGISTERCONNECTOR', 'oracle_connector', '10', '10', '5', f.read())
             except Exception as e:
