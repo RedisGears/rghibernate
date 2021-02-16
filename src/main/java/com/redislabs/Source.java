@@ -1,6 +1,7 @@
 package com.redislabs;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -31,7 +32,7 @@ public abstract class Source implements OnRegisteredOperation, OnUnregisteredOpe
    */
   private static final long serialVersionUID = 1L;
 
-  private static final Map<String, Source> sources = new ConcurrentHashMap<>();
+  protected static final Map<String, Source> sources = new ConcurrentHashMap<>();
   
   public static Source getSource(String name) {
     return sources.get(name);    
@@ -101,7 +102,7 @@ public abstract class Source implements OnRegisteredOperation, OnUnregisteredOpe
       this.registrationIds = new ArrayList<>();
     }
     this.registrationIds.add(registrationId);
-    RGHibernate.getOrCreate(this.connector).AddSource(this.name, this.xmlDef);
+    RGHibernate.getOrCreate(this.connector).addSource(this.name, this.xmlDef);
     sources.put(this.name, this);
     System.setProperty("javax.xml.bind.JAXBContextFactory", "org.eclipse.persistence.jaxb.JAXBContextFactory");
   }
@@ -178,19 +179,11 @@ public abstract class Source implements OnRegisteredOperation, OnUnregisteredOpe
   
   @Override
   public Iterator<Object> iterator() {
-    List<Object> s = new ArrayList<>();
-    s.add("name");
-    s.add(this.getName());
-    s.add("registrationId");
-    s.add(registrationIds);
-    s.add("hashPrefix");
-    s.add(hashPrefix);
-    s.add("connector");
-    s.add(this.getConnector());
-    s.add("idProperty");
-    s.add(idProperty);
-    s.add("Mappings");
-    s.add(propertyMappings.values());
-    return s.iterator();
+    return Arrays.asList(name, getName(), 
+        "registrationIds", registrationIds,
+        "hashPrefix", hashPrefix, 
+        "connector", getConnector(),
+        "idProperty", idProperty, 
+        "mappings", propertyMappings.values()).iterator();
   }
 }

@@ -54,19 +54,6 @@ class TimeLimit(object):
         self.env.assertTrue(False, message=self.msg)
         raise Exception(self.msg)
 
-def Connect():
-    ConnectionStr = 'oracle://{user}:{password}@{db}'.format(user='system', password='oracle', db='localhost:1521/xe')
-    engine = create_engine(ConnectionStr).execution_options(autocommit=True)
-    conn = engine.connect()
-    return conn
-
-def GetConnection():
-    while True:
-        try:
-            return Connect() 
-        except Exception as e:
-            time.sleep(1)
-
 class MysqlBackend:
     def __init__(self):
         subprocess.Popen(['/bin/bash', 'service', 'mysql', 'restart'], stdout=subprocess.PIPE).wait()
@@ -78,21 +65,21 @@ class MysqlBackend:
         subprocess.Popen(['/bin/bash', 'service', 'mysql', 'start'], stdout=subprocess.PIPE).wait()
 
     def getDBConn(self):
-        return self.GetConnection()
+        return self.getConnection()
 
     def getConnectionHibernateFile(self):
         return '../src/test/resources/mysql_hibernate.cfg.xml'
 
-    def Connect(self):
-        ConnectionStr = 'mysql+pymysql://{user}:{password}@{db}'.format(user='demouser', password='Password123!', db='localhost:3306/test')
-        engine = create_engine(ConnectionStr).execution_options(autocommit=True)
+    def connectToDB(self):
+        connection_str = 'mysql+pymysql://{user}:{password}@{db}'.format(user='demouser', password='Password123!', db='localhost:3306/test')
+        engine = create_engine(connection_str).execution_options(autocommit=True)
         conn = engine.connect()
         return conn
 
-    def GetConnection(self):
+    def getConnection(self):
         while True:
             try:
-                return self.Connect() 
+                return self.connectToDB() 
             except Exception as e:
                 print(e)
                 time.sleep(1)
@@ -129,21 +116,21 @@ class OracleBackend:
         self.network.connect(self.container.attrs['Id'])
 
     def getDBConn(self):
-        return self.GetConnection()
+        return self.getConnection()
 
     def getConnectionHibernateFile(self):
         return '../src/test/resources/hibernate.cfg.xml'
 
-    def Connect(self):
-        ConnectionStr = 'oracle://{user}:{password}@{db}'.format(user='system', password='oracle', db='localhost:1521/xe')
-        engine = create_engine(ConnectionStr).execution_options(autocommit=True)
+    def connectToDB(self):
+        connection_str = 'oracle://{user}:{password}@{db}'.format(user='system', password='oracle', db='localhost:1521/xe')
+        engine = create_engine(connection_str).execution_options(autocommit=True)
         conn = engine.connect()
         return conn
 
-    def GetConnection(self):
+    def getConnection(self):
         while True:
             try:
-                return self.Connect() 
+                return self.connectToDB() 
             except Exception as e:
                 time.sleep(1)
 

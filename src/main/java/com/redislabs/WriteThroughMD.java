@@ -4,10 +4,10 @@ import gears.GearsFuture;
 
 public class WriteThroughMD {
   
-  private String streamID;
-  private GearsFuture<String> f;
-  private long startTime;
-  private long timeout;
+  private final String streamID;
+  private final GearsFuture<String> f;
+  private final long startTime;
+  private final long timeout;
   
   public WriteThroughMD(String streamID, GearsFuture<String> f, long timeout) {
     this.streamID = streamID;
@@ -16,7 +16,7 @@ public class WriteThroughMD {
     this.startTime = System.currentTimeMillis();
   }
   
-  public boolean TryFree(String currStreamID) throws Exception {
+  public boolean tryFree(String currStreamID) throws Exception {
     if(currStreamID != null && currStreamID.compareTo(streamID) >= 0) {
       f.setResult(streamID);
       return true;

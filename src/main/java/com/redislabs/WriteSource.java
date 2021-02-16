@@ -15,12 +15,6 @@ import gears.LogLevel;
 import gears.readers.KeysReader;
 import gears.records.KeysReaderRecord;
 
-
-//Object pendingsWrites = GearsBuilder.execute("xlen", String.format("%s-{%s}", streamName, GearsBuilder.hashtag()));
-//s.add("PendingWrites");
-//s.add(pendingsWrites.toString());
-
-
 public class WriteSource extends Source{
   
   /**
