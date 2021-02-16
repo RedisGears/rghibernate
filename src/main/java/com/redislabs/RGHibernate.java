@@ -34,6 +34,7 @@ public class RGHibernate implements Closeable, Serializable {
     if(ret == null) {
       ret = new RGHibernate(name);
     }
+    hibernateConnections.put(ret.name, ret);
     return ret;
   }
   
@@ -53,7 +54,6 @@ public class RGHibernate implements Closeable, Serializable {
   public RGHibernate(String name) {
     this.name = name;
     this.sources = new HashMap<>();
-    hibernateConnections.put(this.name, this);
   }
   
   public String getXmlConf() {
