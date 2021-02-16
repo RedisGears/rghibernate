@@ -91,7 +91,7 @@ public abstract class Source implements OnRegisteredOperation, OnUnregisteredOpe
   
   @Override
   public void onUnregistered() throws Exception {
-    Connector c = Connector.GetConnector(connector);
+    Connector c = Connector.getConnector(connector);
     c.removeSource(this);
     sources.remove(name);
   }
@@ -114,7 +114,7 @@ public abstract class Source implements OnRegisteredOperation, OnUnregisteredOpe
   }
   
   protected Connector getConnectorObj() {
-    return Connector.GetConnector(connector);
+    return Connector.getConnector(connector);
   }
 
   public String getConnector() {

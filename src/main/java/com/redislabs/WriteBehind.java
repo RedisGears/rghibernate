@@ -19,7 +19,7 @@ import gears.readers.CommandReader;
 
 public class WriteBehind{
   
-  public static final int VERSION = 101;
+  public static final int VERSION = 102;
   
   public static class UpdateInfo{
     
@@ -124,7 +124,7 @@ public class WriteBehind{
       int batchSize = Integer.parseInt(new String((byte[])r[2]));
       int duration = Integer.parseInt(new String((byte[])r[3]));
       int retryInterval = Integer.parseInt(new String((byte[])r[4]));
-      if(Connector.GetConnector(connectorName)!=null) {
+      if(Connector.getConnector(connectorName)!=null) {
         throw new Exception("connector already exists");
       }
       new Connector(connectorName, connectorXml, batchSize, duration, retryInterval);
@@ -170,7 +170,7 @@ public class WriteBehind{
       if(WriteSource.getSource(sourceName) != null) {
         throw new Exception("source already exists");
       }
-      Connector c = Connector.GetConnector(connectorName);
+      Connector c = Connector.getConnector(connectorName);
       if(c == null) {
         throw new Exception("connector does not exists");
       }
@@ -202,7 +202,7 @@ public class WriteBehind{
     GearsBuilder.CreateGearsBuilder(newRemoveConnectorReader, "Unregiste connector").
     map(r->{
       String connectorName = new String((byte[])r[1]);
-      Connector c = Connector.GetConnector(connectorName);
+      Connector c = Connector.getConnector(connectorName);
       if(c == null) {
         throw new Exception("connector does exists");
       }

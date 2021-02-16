@@ -86,7 +86,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     return connectors.values();    
   }
   
-  static Connector GetConnector(String name) {
+  static Connector getConnector(String name) {
     return connectors.get(name);
   }
   

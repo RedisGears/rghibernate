@@ -104,7 +104,7 @@ public class WriteSource extends Source{
       streamId = foreachInternal(record);
       
       WriteThroughMD wtMD = new WriteThroughMD(streamId, f, timeout * 1000);
-      Connector c = Connector.GetConnector(this.getConnector());
+      Connector c = Connector.getConnector(this.getConnector());
       c.queue.add(wtMD);
     }catch(Exception e) {
       GearsBuilder.overrideReply(String.format("-Err %s", e.toString()));
