@@ -2,22 +2,16 @@ package com.redislabs;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import gears.ExecutionMode;
 import gears.GearsBuilder;
-import gears.GearsFuture;
 import gears.operations.ForeachOperation;
-import gears.operations.MapOperation;
-import gears.readers.CommandOverrider;
-import gears.readers.CommandReader;
 import gears.readers.KeysReader;
 import gears.records.KeysReaderRecord;
 

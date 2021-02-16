@@ -17,7 +17,6 @@ import org.hibernate.mapping.PersistentClass;
 import org.hibernate.mapping.Property;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import gears.GearsBuilder;
@@ -32,7 +31,7 @@ public abstract class Source implements OnRegisteredOperation, OnUnregisteredOpe
    */
   private static final long serialVersionUID = 1L;
 
-  static Map<String, Source> sources = new ConcurrentHashMap<>();
+  private static final Map<String, Source> sources = new ConcurrentHashMap<>();
   
   public static Source getSource(String name) {
     return sources.get(name);    

@@ -19,7 +19,7 @@ import gears.readers.CommandReader;
 
 public class WriteBehind{
   
-  public static int VERSION=101;
+  public static final int VERSION = 101;
   
   public static class UpdateInfo{
     
@@ -35,7 +35,7 @@ public class WriteBehind{
 
     public Collection<Connector> getConnectors() {
       if(connectors == null) {
-        return new ArrayList<Connector>();
+        return new ArrayList<>();
       }
       return connectors;
     }
@@ -46,7 +46,7 @@ public class WriteBehind{
 
     public Collection<Source> getSources() {
       if(sources == null) {
-        return new ArrayList<Source>();
+        return new ArrayList<>();
       }
       return sources;
     }

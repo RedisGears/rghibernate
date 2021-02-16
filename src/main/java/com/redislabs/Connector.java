@@ -22,7 +22,6 @@ import org.hibernate.service.spi.ServiceRegistryImplementor;
 
 import gears.ExecutionMode;
 import gears.GearsBuilder;
-import gears.GearsFuture;
 import gears.LogLevel;
 import gears.operations.AccumulateOperation;
 import gears.operations.ForeachOperation;
@@ -31,7 +30,6 @@ import gears.operations.OnRegisteredOperation;
 import gears.operations.OnUnregisteredOperation;
 import gears.readers.StreamReader;
 import gears.readers.StreamReader.FailurePolicy;
-import oracle.ucp.common.waitfreepool.Tuple;
 
 public class Connector implements ForeachOperation<ArrayList<HashMap<String,Object>>>,
 AccumulateOperation<HashMap<String,Object>, ArrayList<HashMap<String, Object>>>,
@@ -83,7 +81,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
    */
   private static final long serialVersionUID = 1L;
 
-  public static Map<String, Connector> connectors = new ConcurrentHashMap<>();
+  public static final Map<String, Connector> connectors = new ConcurrentHashMap<>();
   
   static Collection<Connector> getAllConnectors() {
     return connectors.values();    
