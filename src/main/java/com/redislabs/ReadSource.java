@@ -117,7 +117,7 @@ public class ReadSource extends Source implements ForeachOperation<KeysReaderRec
         }
       }
       
-      if(response.isEmpty() && originalCmd.equals("hget")) {
+      if(!response.isEmpty() && originalCmd.equals("hget")) {
         GearsBuilder.overrideReply(response.get(0));
       }else {
         GearsBuilder.overrideReply(response);
