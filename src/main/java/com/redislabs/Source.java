@@ -18,7 +18,6 @@ import org.hibernate.mapping.PersistentClass;
 import org.hibernate.mapping.Property;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import gears.GearsBuilder;
@@ -33,7 +32,7 @@ public abstract class Source implements OnRegisteredOperation, OnUnregisteredOpe
    */
   private static final long serialVersionUID = 1L;
 
-  protected static Map<String, Source> sources = new ConcurrentHashMap<>();
+  protected static final Map<String, Source> sources = new ConcurrentHashMap<>();
   
   public static Source getSource(String name) {
     return sources.get(name);    
@@ -61,7 +60,7 @@ public abstract class Source implements OnRegisteredOperation, OnUnregisteredOpe
     this.connector = connector;
     this.name = name;
     this.xmlDef = xmlDef;
-    this.propertyMappings = new HashMap<String, PropertyData>();
+    this.propertyMappings = new HashMap<>();
     
     StandardServiceRegistry tempRegistry = new StandardServiceRegistryBuilder()
         .configure( InMemoryURLFactory.getInstance().build("configuration", RGHibernate.get(connector).getXmlConf()))
@@ -100,7 +99,7 @@ public abstract class Source implements OnRegisteredOperation, OnUnregisteredOpe
   @Override
   public void onRegistered(String registrationId) throws Exception {
     if(this.registrationIds == null) {
-      this.registrationIds = new ArrayList<String>();
+      this.registrationIds = new ArrayList<>();
     }
     this.registrationIds.add(registrationId);
     RGHibernate.getOrCreate(this.connector).addSource(this.name, this.xmlDef);

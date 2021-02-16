@@ -19,7 +19,7 @@ import gears.readers.CommandReader;
 
 public class WriteBehind{
   
-  public static int VERSION=101;
+  public static final int VERSION = 101;
   
   public static class UpdateInfo{
     
@@ -35,7 +35,7 @@ public class WriteBehind{
 
     public Collection<Connector> getConnectors() {
       if(connectors == null) {
-        return new ArrayList<Connector>();
+        return new ArrayList<>();
       }
       return connectors;
     }
@@ -46,7 +46,7 @@ public class WriteBehind{
 
     public Collection<Source> getSources() {
       if(sources == null) {
-        return new ArrayList<Source>();
+        return new ArrayList<>();
       }
       return sources;
     }
@@ -76,7 +76,7 @@ public class WriteBehind{
     
     UpdateInfo updateInfo = null;
     Object[] sessions = (Object[])((Object[])GearsBuilder.execute("RG.JDUMPSESSIONS"))[1];
-    List<Object[]> oldVersions = Arrays.stream(sessions).map(s->(Object[])s).
+    List<Object[]> oldVersions = Arrays.stream(sessions).map(Object[].class::cast).
         filter(s->s[3].equals("com.redislabs.WriteBehind") && !s[9].toString().equals("0")).collect(Collectors.toList());
     if(oldVersions.size() > 2) {
       throw new Exception("Found more then one WriteBehind versions installed, fatal!!");
@@ -111,7 +111,7 @@ public class WriteBehind{
       
       GearsBuilder.log("Unregister managemen operations");
       Object[] registrations = (Object[])GearsBuilder.execute("RG.DUMPREGISTRATIONS");
-      Arrays.stream(registrations).map(r->(Object[])r).filter(r->r[9].toString().contains(String.format("'SessionId':'%s'", sessionId)))
+      Arrays.stream(registrations).map(Object[].class::cast).filter(r->r[9].toString().contains(String.format("'SessionId':'%s'", sessionId)))
       .forEach(r->GearsBuilder.execute("RG.UNREGISTER", r[1].toString()));
     }
     
@@ -229,11 +229,11 @@ public class WriteBehind{
         }
         
         if("CONNECTORS".equals(subInfoCommand)) {
-          return Connector.getAllConnectors().stream().map(e->(Serializable)e).collect(Collectors.toList());
+          return Connector.getAllConnectors().stream().map(Serializable.class::cast).collect(Collectors.toList());
         }
         
         if("SOURCES".equals(subInfoCommand)) {
-          return WriteSource.getAllSources().stream().map(e->(Serializable)e).collect(Collectors.toList());
+          return WriteSource.getAllSources().stream().map(Serializable.class::cast).collect(Collectors.toList());
         }
         
         if("GENERAL".equals(subInfoCommand)) {

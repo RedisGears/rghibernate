@@ -1,41 +1,19 @@
 package com.redislabs;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import java.io.Serializable;
-
-import org.hibernate.boot.Metadata;
-import org.hibernate.boot.MetadataSources;
-import org.hibernate.boot.registry.StandardServiceRegistry;
-import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
-import org.hibernate.mapping.Column;
-import org.hibernate.mapping.PersistentClass;
-import org.hibernate.mapping.Property;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import gears.ExecutionMode;
 import gears.GearsBuilder;
 import gears.GearsFuture;
 import gears.LogLevel;
-import gears.operations.AsyncForeachOperation;
-import gears.operations.AsyncMapOperation;
-import gears.operations.ForeachOperation;
-import gears.operations.GearsFutureOnDone;
-import gears.operations.OnRegisteredOperation;
-import gears.operations.OnUnregisteredOperation;
-import gears.readers.CommandOverrider;
 import gears.readers.KeysReader;
 import gears.records.KeysReaderRecord;
-import oracle.ucp.common.waitfreepool.Tuple;
 
 public class WriteSource extends Source{
   
@@ -108,7 +86,7 @@ public class WriteSource extends Source{
 
   public GearsFuture<String> asyncforeach(KeysReaderRecord record) throws Exception {
     GearsFuture<String> f = null;
-    f = new GearsFuture<String>();
+    f = new GearsFuture<>();
     
     String streamId = null;
     
@@ -171,7 +149,7 @@ public class WriteSource extends Source{
       Stream<String> commandStream = Stream.concat(commandStreamInit, Stream.of(Connector.EVENT_STR, "hset"));
       
       // verify schema:
-      Map<String, String> valuesToWrite = new HashMap<String, String>();
+      Map<String, String> valuesToWrite = new HashMap<>();
       for(PropertyData pd : getPropertyMappings().values()) {
         String val = null;
         try {
@@ -198,9 +176,7 @@ public class WriteSource extends Source{
       command = commandStream.toArray(String[]::new);
     }
   
-    String streamId = (String)GearsBuilder.execute(command); // Write to stream
-    
-    return streamId;
+    return (String)GearsBuilder.execute(command); // Write to stream
   }
   
   @Override

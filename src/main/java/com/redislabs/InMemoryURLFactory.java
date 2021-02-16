@@ -8,6 +8,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLStreamHandler;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.WeakHashMap;
 
@@ -30,11 +31,7 @@ public class InMemoryURLFactory {
   }
 
   public URL build(String path, String data) {
-      try {
-          return build(path, data.getBytes( "UTF-8"));
-      } catch (UnsupportedEncodingException ex) {
-          throw new RuntimeException(ex);
-      }
+    return build(path, data.getBytes( StandardCharsets.UTF_8));
   }
 
   public URL build(String path, byte[] data) {

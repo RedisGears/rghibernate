@@ -23,7 +23,6 @@ import org.hibernate.service.spi.ServiceRegistryImplementor;
 
 import gears.ExecutionMode;
 import gears.GearsBuilder;
-import gears.GearsFuture;
 import gears.LogLevel;
 import gears.operations.AccumulateOperation;
 import gears.operations.ForeachOperation;
@@ -32,7 +31,6 @@ import gears.operations.OnRegisteredOperation;
 import gears.operations.OnUnregisteredOperation;
 import gears.readers.StreamReader;
 import gears.readers.StreamReader.FailurePolicy;
-import oracle.ucp.common.waitfreepool.Tuple;
 
 public class Connector implements ForeachOperation<ArrayList<HashMap<String,Object>>>,
 AccumulateOperation<HashMap<String,Object>, ArrayList<HashMap<String, Object>>>,
@@ -202,7 +200,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     
     Source source = (WriteSource)Source.getSource(sourceName);
     
-    Map<String, Object> newMap = new HashMap<String, Object>();
+    Map<String, Object> newMap = new HashMap<>();
     PropertyData idProperty =  source.getIdProperty();
     
     String val = map.remove(idProperty.getName());
