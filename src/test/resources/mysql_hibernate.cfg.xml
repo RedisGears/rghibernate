@@ -7,22 +7,11 @@
 		<!-- JDBC Database connection settings -->
 		<property name="connection.driver_class">org.mariadb.jdbc.Driver</property>
 		<property name="connection.url">jdbc:mysql://localhost:3306/test?allowPublicKeyRetrieval=true&amp;useSSL=false</property>
-		<!--property name="hibernate.connection.driver_class">oracle.jdbc.driver.OracleDriver</property>
-		<property name="hibernate.connection.url">jdbc:oracle:thin:@localhost:1521:xe</property>
-                <property name="hibernate.connection.username">system</property>
-                <property name="hibernate.connection.password">oracle</property>
-		<property name="hibernate.dialect">org.hibernate.dialect.OracleDialect</property-->
-		<!--Property name="hbm2ddl.auto">create-drop</property-->
-                <!--property name="connection.driver_class">org.hsqldb.jdbcDriver</property>
-                <property name="connection.url">jdbc:hsqldb:data/tutorial6</property-->
 		<property name="connection.username">demouser</property>
 		<property name="connection.password">Password123!</property>
 		<!-- JDBC connection pool settings ... using built-in test pool -->
 		<property name="connection.pool_size">1</property>
-		<!-- Select our SQL dialect -->
-		<!--property name="dialect">org.hibernate.dialect.MySQL5Dialect</property-->
-		<!--property name="dialect">org.hibernate.dialect.HSQLDialect</property-->
-		<!-- Echo the SQL to stdout -->
+		<!-- Should echo the SQL to stdout? -->
 		<property name="show_sql">false</property>
 		<!-- Set the current session context -->
 		<property name="current_session_context_class">thread</property>

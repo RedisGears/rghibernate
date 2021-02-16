@@ -29,7 +29,7 @@ public class RGHibernate implements Closeable, Serializable {
 
   private static final long serialVersionUID = 1L;
 
-  private static Map<String, RGHibernate> hibernateConnections = new HashMap<String, RGHibernate>();
+  private static final Map<String, RGHibernate> hibernateConnections = new HashMap<>();
   
   public static RGHibernate getOrCreate(String name) {
     RGHibernate ret = hibernateConnections.get(name);
@@ -66,7 +66,7 @@ public class RGHibernate implements Closeable, Serializable {
     this.xmlConf = xmlConf;
   }
   
-  public void CloseSession() {
+  public void closeSession() {
     if(session == null) {
       return;
     }
@@ -100,7 +100,7 @@ public class RGHibernate implements Closeable, Serializable {
     nextConnetRetry = System.currentTimeMillis() + 5000; // retry each 5 seconds
   }
 
-  private void GenerateSession() {
+  private void generateSession() {
     registry = new StandardServiceRegistryBuilder()
         .configure(InMemoryURLFactory.getInstance().build("configuration", xmlConf)).build();
     MetadataSources sources = new MetadataSources(registry);
@@ -115,21 +115,21 @@ public class RGHibernate implements Closeable, Serializable {
     GearsBuilder.log(String.format("%s connector Connected successfully", name));
   }
   
-  public void AddSource(String sourceName, String sourceXmlDef) {
+  public void addSource(String sourceName, String sourceXmlDef) {
     sources.put(sourceName, sourceXmlDef);
     synchronized (this) {
-      CloseSession();
+      closeSession();
     }
   }
   
-  public void RemoveSource(String sourceName) {
+  public void removeSource(String sourceName) {
     sources.remove(sourceName);
     synchronized (this) {
-      CloseSession();
+      closeSession();
     }
   }
   
-  public int NumSources() {
+  public int numSources() {
     return sources.size();
   }
 
@@ -141,7 +141,7 @@ public class RGHibernate implements Closeable, Serializable {
         }
       }
       try {
-        GenerateSession();
+        generateSession();
         nextConnetRetry = 0;
       }catch(Exception e) {
         nextConnetRetry = System.currentTimeMillis() + 5000; // we will retry in 5 seconds.
@@ -181,7 +181,7 @@ public class RGHibernate implements Closeable, Serializable {
 
   @Override
   public void close() throws IOException {
-    CloseSession();
+    closeSession();
 
     try {
       Enumeration<Driver> de = DriverManager.getDrivers();

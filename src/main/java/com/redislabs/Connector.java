@@ -2,6 +2,7 @@ package com.redislabs;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -43,7 +44,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
   public static final String EVENT_STR = "__event__";
   public static final String SOURCE_STR = "__source__";
   
-  class MyStandardServiceInitiator implements StandardServiceInitiator<Service>{
+  class RGHibernateStandardServiceInitiator implements StandardServiceInitiator<Service>{
 
     private Map values;
     
@@ -65,13 +66,11 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     
     @Override
     public Class<Service> getServiceInitiated() {
-      // TODO Auto-generated method stub
       return null;
     }
 
     @Override
     public Service initiateService(Map configurationValues, ServiceRegistryImplementor registry) {
-      // TODO Auto-generated method stub
       values = configurationValues;
       return null;
     }
@@ -83,7 +82,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
    */
   private static final long serialVersionUID = 1L;
 
-  public static Map<String, Connector> connectors = new ConcurrentHashMap<>();
+  public static final Map<String, Connector> connectors = new ConcurrentHashMap<>();
   
   static Collection<Connector> getAllConnectors() {
     return connectors.values();    
@@ -121,7 +120,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
         .configure( InMemoryURLFactory.getInstance().build("configuration", this.xmlDef))
         .build();
     
-    MyStandardServiceInitiator initiator = this.new MyStandardServiceInitiator();
+    RGHibernateStandardServiceInitiator initiator = this.new RGHibernateStandardServiceInitiator();
     tempRegistry.initiateService(initiator);
     
     this.url = initiator.getUrl();
@@ -145,9 +144,12 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
 
     GearsBuilder<HashMap<String,Object>> builder = GearsBuilder.CreateGearsBuilder(streamReader, String.format("%s connector", name));
     
-    builder.map(this).accumulate(this).foreach(this).
-    map(ArrayList<HashMap<String, Object>>::size).
-    register(ExecutionMode.ASYNC_LOCAL, this, this);
+    builder
+    .map(this)
+    .accumulate(this)
+    .foreach(this)
+    .map(ArrayList<HashMap<String, Object>>::size)
+    .register(ExecutionMode.ASYNC_LOCAL, this, this);
   }
   
   public String getUuid() {
@@ -156,16 +158,16 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
 
   @Override
   public void onUnregistered() throws Exception {
-    connector.close();
     connectors.remove(this.name);
+    connector.close();
   }
   
   public void addSource(Source s) {
-    connector.AddSource(s.getName(), s.getXmlDef());
+    connector.addSource(s.getName(), s.getXmlDef());
   }
   
   public void removeSource(Source s) {
-    connector.RemoveSource(s.getName());
+    connector.removeSource(s.getName());
   }
 
   @Override
@@ -183,7 +185,6 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
   @Override
   public ArrayList<HashMap<String, Object>> accumulate(ArrayList<HashMap<String, Object>> a,
       HashMap<String, Object> r) throws Exception {
-    // TODO Auto-generated method stub
     if(a == null) {
       a = new ArrayList<>();
     }
@@ -288,7 +289,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
       }catch (Exception e) {
         msg = String.format("Failed commiting transaction error='%s'", e.toString());
         GearsBuilder.log(msg, LogLevel.WARNING);
-        connector.CloseSession();
+        connector.closeSession();
         lastStreamId = null;
         cause = e;
       }
@@ -296,7 +297,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
       while(!queue.isEmpty()) {
         WriteThroughMD wtMD = queue.peek();
         
-        if(wtMD.TryFree(lastStreamId)) {
+        if(wtMD.tryFree(lastStreamId)) {
           queue.remove();
           continue;
         }
@@ -320,7 +321,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
       }catch(Exception e) {
         String msg = String.format("Failed fetching data from databse, error='%s'", e.toString());
         GearsBuilder.log(msg, LogLevel.WARNING);
-        connector.CloseSession();
+        connector.closeSession();
         throw e;
       }
     }
@@ -334,31 +335,11 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
 
   @Override
   public Iterator<String> iterator() {
-    List<String> s = new ArrayList<>();
-    s.add("name");
-    s.add(name);
-    s.add("url");
-    s.add(url);
-    s.add("driverClass");
-    s.add(driverClass);
-    s.add("userName");
-    s.add(userName);
-    s.add("dialect");
-    s.add(dialect);
-    s.add("uuid");
-    s.add(uuid);
-    s.add("registrationId");
-    s.add(registrationId);
-    s.add("batchSize");
-    s.add(Integer.toString(batchSize));
-    s.add("duration");
-    s.add(Integer.toString(duration));
-    s.add("retryInterval");
-    s.add(Integer.toString(retryInterval));
-    s.add("streamName");
-    s.add(expectedStreamName);
-    s.add("pendingClients");
-    s.add(Integer.toString(queue.size()));
+    List<String> s = Arrays.asList("name", name, "url", url, "driverClass", driverClass,
+        "userName", userName, "dialect", dialect, "uuid", uuid,
+        "registrationId", registrationId, "batchSize", Integer.toString(batchSize),
+        "duration", Integer.toString(duration), "retryInterval", Integer.toString(retryInterval),
+        "streamName", expectedStreamName, "pendingClients", Integer.toString(queue.size()));
     Long backlog = (Long)GearsBuilder.execute("xlen", expectedStreamName);
     s.add("backlog");
     s.add(Long.toString(backlog));
@@ -366,7 +347,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
   }
   
   public void unregister() throws Exception {
-    if(connector != null && connector.NumSources() > 0) {
+    if(connector != null && connector.numSources() > 0) {
       throw new Exception("Can't unregister connector with sources");
     }
     GearsBuilder.execute("RG.UNREGISTER", registrationId);
