@@ -27,7 +27,7 @@ public class RGHibernate implements Closeable, Serializable {
 
   private static final long serialVersionUID = 1L;
 
-  private static Map<String, RGHibernate> hibernateConnections = new HashMap<String, RGHibernate>();
+  private static Map<String, RGHibernate> hibernateConnections = new HashMap<>();
   
   public static RGHibernate getOrCreate(String name) {
     RGHibernate ret = hibernateConnections.get(name);

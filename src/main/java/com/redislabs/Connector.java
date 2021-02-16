@@ -199,7 +199,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     
     Source source = (WriteSource)Source.getSource(sourceName);
     
-    Map<String, Object> newMap = new HashMap<String, Object>();
+    Map<String, Object> newMap = new HashMap<>();
     PropertyData idProperty =  source.getIdProperty();
     
     String val = map.remove(idProperty.getName());

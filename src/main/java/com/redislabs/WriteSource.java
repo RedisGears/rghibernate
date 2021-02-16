@@ -92,7 +92,7 @@ public class WriteSource extends Source{
 
   public GearsFuture<String> asyncforeach(KeysReaderRecord record) throws Exception {
     GearsFuture<String> f = null;
-    f = new GearsFuture<String>();
+    f = new GearsFuture<>();
     
     String streamId = null;
     
@@ -155,7 +155,7 @@ public class WriteSource extends Source{
       Stream<String> commandStream = Stream.concat(commandStreamInit, Stream.of(Connector.EVENT_STR, "hset"));
       
       // verify schema:
-      Map<String, String> valuesToWrite = new HashMap<String, String>();
+      Map<String, String> valuesToWrite = new HashMap<>();
       for(PropertyData pd : getPropertyMappings().values()) {
         String val = null;
         try {
@@ -182,9 +182,7 @@ public class WriteSource extends Source{
       command = commandStream.toArray(String[]::new);
     }
   
-    String streamId = (String)GearsBuilder.execute(command); // Write to stream
-    
-    return streamId;
+    return (String)GearsBuilder.execute(command); // Write to stream
   }
   
   @Override

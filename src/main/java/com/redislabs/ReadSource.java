@@ -49,7 +49,7 @@ public class ReadSource extends Source implements ForeachOperation<KeysReaderRec
     String originalCmd = new String(originalCommand[0]).toLowerCase();
     List<String> fields = null;
     if(originalCmd.equals("hget") || originalCmd.equals("hmget")) {
-      fields = new ArrayList<String>();
+      fields = new ArrayList<>();
       for(int i = 2 ; i < originalCommand.length ; ++i) {
         fields.add(new String(originalCommand[i]).toLowerCase());
       }
@@ -62,7 +62,7 @@ public class ReadSource extends Source implements ForeachOperation<KeysReaderRec
       throw e;
     }
     if (res != null) {
-      List<String> command = new ArrayList<String>();
+      List<String> command = new ArrayList<>();
       command.add("hset");
       command.add(key);
       for(Entry<String, Object> e: res.entrySet()) {
@@ -117,7 +117,7 @@ public class ReadSource extends Source implements ForeachOperation<KeysReaderRec
         }
       }
       
-      if(response.size() > 0 && originalCmd.equals("hget")) {
+      if(response.isEmpty() && originalCmd.equals("hget")) {
         GearsBuilder.overrideReply(response.get(0));
       }else {
         GearsBuilder.overrideReply(response);

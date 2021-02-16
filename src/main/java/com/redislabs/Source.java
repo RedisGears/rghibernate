@@ -59,7 +59,7 @@ public abstract class Source implements OnRegisteredOperation, OnUnregisteredOpe
     this.connector = connector;
     this.name = name;
     this.xmlDef = xmlDef;
-    this.propertyMappings = new HashMap<String, PropertyData>();
+    this.propertyMappings = new HashMap<>();
     
     StandardServiceRegistry tempRegistry = new StandardServiceRegistryBuilder()
         .configure( InMemoryURLFactory.getInstance().build("configuration", RGHibernate.get(connector).getXmlConf()))
@@ -98,7 +98,7 @@ public abstract class Source implements OnRegisteredOperation, OnUnregisteredOpe
   @Override
   public void onRegistered(String registrationId) throws Exception {
     if(this.registrationIds == null) {
-      this.registrationIds = new ArrayList<String>();
+      this.registrationIds = new ArrayList<>();
     }
     this.registrationIds.add(registrationId);
     RGHibernate.getOrCreate(this.connector).AddSource(this.name, this.xmlDef);
