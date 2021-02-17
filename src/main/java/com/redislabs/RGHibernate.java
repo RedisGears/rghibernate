@@ -33,8 +33,8 @@ public class RGHibernate implements Closeable, Serializable {
     RGHibernate ret = hibernateConnections.get(name);
     if(ret == null) {
       ret = new RGHibernate(name);
+      hibernateConnections.put(ret.name, ret);
     }
-    hibernateConnections.put(ret.name, ret);
     return ret;
   }
   
