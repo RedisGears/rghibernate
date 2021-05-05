@@ -8,7 +8,10 @@ import java.lang.reflect.Method;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.Collection;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
@@ -17,38 +20,55 @@ import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 
+import gears.GearsBuilder;
+
 
 public class RGHibernate implements Closeable, Serializable {
 
   private static final long serialVersionUID = 1L;
 
-  private String[] args;
+  private static final Map<String, RGHibernate> hibernateConnections = new HashMap<>();
+  
+  public static RGHibernate getOrCreate(String name) {
+    RGHibernate ret = hibernateConnections.get(name);
+    if(ret == null) {
+      ret = new RGHibernate(name);
+      hibernateConnections.put(ret.name, ret);
+    }
+    return ret;
+  }
+  
+  public static RGHibernate get(String name) {
+    return hibernateConnections.get(name);
+  }
+  
+  private String name;
+  private String xmlConf;
+  private Map<String, String> sources;
   private transient Session session = null;
   private transient SessionFactory factory = null;
   private transient StandardServiceRegistry registry = null;
+  
+  private long nextConnetRetry = 0;
 
-  public RGHibernate(String[] args) {
-    this.args = args;
+  public RGHibernate(String name) {
+    this.name = name;
+    this.sources = new HashMap<>();
+  }
+  
+  public String getXmlConf() {
+    return xmlConf;
   }
 
-  public void generateSession() {
-    registry = new StandardServiceRegistryBuilder()
-        .configure(InMemoryURLFactory.getInstance().build("configuration", args[0])).build();
-    MetadataSources sources = new MetadataSources(registry);
-    for (int i = 1; i < args.length; ++i) {
-      sources.addURL(InMemoryURLFactory.getInstance().build("mapping", args[i]));
+  public void setXmlConf(String xmlConf) {
+    this.xmlConf = xmlConf;
+  }
+  
+  public void closeSession() {
+    if(session == null) {
+      return;
     }
-    Metadata metadata = sources.getMetadataBuilder().build();
-
-    factory = metadata.getSessionFactoryBuilder().build();
-    session = factory.openSession();
-  }
-
-  public Session getSession() {
-    return session;
-  }
-
-  public void recreateSession() {
+    
     try {
       session.clear();
     } catch (Exception e) {
@@ -72,9 +92,63 @@ public class RGHibernate implements Closeable, Serializable {
     } catch (Exception e) {
       // TODO: handle exception
     }
-
-    generateSession();
+    
+    session = null;
+    
+    nextConnetRetry = System.currentTimeMillis() + 5000; // retry each 5 seconds
   }
+
+  private void generateSession() {
+    registry = new StandardServiceRegistryBuilder()
+        .configure(InMemoryURLFactory.getInstance().build("configuration", xmlConf)).build();
+    MetadataSources sources = new MetadataSources(registry);
+    Collection<String> srcs = this.sources.values();
+    for (String src : srcs) {
+      sources.addURL(InMemoryURLFactory.getInstance().build("mapping", src));
+    }
+    Metadata metadata = sources.getMetadataBuilder().build();
+
+    factory = metadata.getSessionFactoryBuilder().build();
+    session = factory.openSession();
+    GearsBuilder.log(String.format("%s connector Connected successfully", name));
+  }
+  
+  public void addSource(String sourceName, String sourceXmlDef) {
+    sources.put(sourceName, sourceXmlDef);
+    synchronized (this) {
+      closeSession();
+    }
+  }
+  
+  public void removeSource(String sourceName) {
+    sources.remove(sourceName);
+    synchronized (this) {
+      closeSession();
+    }
+  }
+  
+  public int numSources() {
+    return sources.size();
+  }
+
+  public Session getSession() {
+    if(session == null) {
+      if(nextConnetRetry > 0) {
+        if(nextConnetRetry > System.currentTimeMillis()) {
+          throw new RuntimeException("Disconnected from database");
+        }
+      }
+      try {
+        generateSession();
+        nextConnetRetry = 0;
+      }catch(Exception e) {
+        nextConnetRetry = System.currentTimeMillis() + 5000; // we will retry in 5 seconds.
+        throw e;
+      }
+    }
+    return session;
+  }
+
 
   protected void cancelTimers() {
     try {
@@ -105,8 +179,7 @@ public class RGHibernate implements Closeable, Serializable {
 
   @Override
   public void close() throws IOException {
-    session.close();
-    factory.close();
+    closeSession();
 
     try {
       Enumeration<Driver> de = DriverManager.getDrivers();
@@ -118,8 +191,7 @@ public class RGHibernate implements Closeable, Serializable {
 
       }
     } catch (SQLException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
+      GearsBuilder.log(String.format("Exception on deregister drivers, %s", e.toString()));
     }
 
     // Closing timer thread for oracle driver not to leak..
