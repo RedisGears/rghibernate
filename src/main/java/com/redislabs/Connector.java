@@ -206,7 +206,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     String val = map.remove(idProperty.getName());
     Object convertedVal = null;
     try {
-      convertedVal = idProperty.convert(val);
+      convertedVal = idProperty.convertToObject(val);
     }catch (Exception e) {
       String msg = String.format("Can not conver id property %s val %s, error='%s'", idProperty.getName(), val, e.toString());
       GearsBuilder.log(msg, LogLevel.WARNING);
@@ -225,7 +225,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
       convertedVal = null;
       try {
         pm = source.getPropertyMapping(key);
-        convertedVal = pm.convert(val);
+        convertedVal = pm.convertToObject(val);
       }catch (Exception e) {
         String msg = String.format("Can not find property mapping for %s val %s, error='%s'", key, val, e.toString());
         GearsBuilder.log(msg, LogLevel.WARNING);
@@ -333,11 +333,11 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
 
   @Override
   public Iterator<String> iterator() {
-    List<String> s = Arrays.asList("name", name, "url", url, "driverClass", driverClass,
+    List<String> s = new ArrayList<>(Arrays.asList("name", name, "url", url, "driverClass", driverClass,
         "userName", userName, "dialect", dialect, "uuid", uuid,
         "registrationId", registrationId, "batchSize", Integer.toString(batchSize),
         "duration", Integer.toString(duration), "retryInterval", Integer.toString(retryInterval),
-        "streamName", expectedStreamName, "pendingClients", Integer.toString(queue.size()));
+        "streamName", expectedStreamName, "pendingClients", Integer.toString(queue.size())));
     Long backlog = (Long)GearsBuilder.execute("xlen", expectedStreamName);
     s.add("backlog");
     s.add(Long.toString(backlog));

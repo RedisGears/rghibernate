@@ -19,7 +19,7 @@ import gears.readers.CommandReader;
 
 public class WriteBehind{
   
-  public static final int VERSION = 102;
+  public static final int VERSION = 103;
   
   public static class UpdateInfo{
     

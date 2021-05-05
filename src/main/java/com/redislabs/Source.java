@@ -179,7 +179,7 @@ public abstract class Source implements OnRegisteredOperation, OnUnregisteredOpe
   
   @Override
   public Iterator<Object> iterator() {
-    return Arrays.asList(name, getName(), 
+    return Arrays.asList("name", getName(), 
         "registrationIds", registrationIds,
         "hashPrefix", hashPrefix, 
         "connector", getConnector(),

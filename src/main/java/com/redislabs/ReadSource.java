@@ -44,7 +44,7 @@ public class ReadSource extends Source implements ForeachOperation<KeysReaderRec
   public void foreach(KeysReaderRecord r) throws Exception {
     String key = r.getKey();
     String pkStr = key.split(":")[1];
-    Object pk = getIdProperty().convert(pkStr);
+    Object pk = getIdProperty().convertToObject(pkStr);
     byte[][] originalCommand = GearsBuilder.getCommand();
     String originalCmd = new String(originalCommand[0]).toLowerCase();
     List<String> fields = null;
@@ -69,8 +69,22 @@ public class ReadSource extends Source implements ForeachOperation<KeysReaderRec
         if(e.getKey().startsWith("$")) {
           continue;
         }
-        command.add(e.getKey());
-        command.add(e.getValue().toString());
+        String propKey = e.getKey();
+        
+        PropertyData pd = null;
+        if(propKey.equals("id")) {
+          pd = getIdProperty();
+        } else {
+          pd = getPropertyMapping(propKey);
+        }
+        if (pd == null) {
+          String error = String.format("-could not find definition for propery %s", propKey);
+          GearsBuilder.overrideReply(error);
+          throw new Exception(error);
+        }
+        command.add(propKey);
+        Object value = e.getValue();
+        command.add(pd.convertToStr(value));
       }
       
       
@@ -104,13 +118,29 @@ public class ReadSource extends Source implements ForeachOperation<KeysReaderRec
           if(e.getKey().startsWith("$")) {
             continue;
           }
-          response.add(e.getKey());
-          response.add(e.getValue().toString());
+          String propKey = e.getKey();
+          
+          PropertyData pd = null;
+          if(propKey.equals("id")) {
+            pd = getIdProperty();
+          } else {
+            pd = getPropertyMapping(propKey);
+          }
+          if (pd == null) {
+            String error = String.format("-could not find definition for propery %s", propKey);
+            GearsBuilder.overrideReply(error);
+            throw new Exception(error);
+          }
+          response.add(propKey);
+          Object value = e.getValue();
+          response.add(pd.convertToStr(value));
         }
       }else {
         for(String f : fields) {
           if(res.containsKey(f)) {
-            response.add(res.get(f).toString());
+            PropertyData pd = getPropertyMapping(f);
+            Object value = res.get(f);
+            response.add(pd != null ? pd.convertToStr(value) : value.toString());
           }else {
             response.add(null);
           }

@@ -1,8 +1,10 @@
 package com.redislabs;
 
 import java.io.Serializable;
+import java.sql.Date;
 
 import org.hibernate.type.AbstractStandardBasicType;
+import org.hibernate.type.TimestampType;
 import org.hibernate.type.Type;
 
 public class PropertyData implements Serializable{
@@ -32,12 +34,34 @@ public class PropertyData implements Serializable{
       }
   }
   
-  public Object convert(String val) {
+  public Object convertToObject(String val) {
     if(adType == null) {
       // best effort, keep it as string.
       return val;
     }
+    if(this.type instanceof TimestampType) {
+      // try first to parse as timestamp
+      try {
+        long timestamp = Long.parseLong(val);
+        return new Date(timestamp);
+      }catch(Exception e) {
+        
+      }
+    }
     return adType.fromString(val);
+  }
+  
+  public String convertToStr(Object val) {
+    if(this.type instanceof TimestampType && val instanceof java.sql.Timestamp) {
+      // try first to parse as timestamp
+      try {
+        return Long.toString(((java.sql.Timestamp)val).getTime());
+      }catch(Exception e) {
+        
+      }
+    }
+    // best effort, use toString on val.
+    return val.toString();
   }
 
   public String getName() {

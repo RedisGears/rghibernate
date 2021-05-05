@@ -131,7 +131,7 @@ public class WriteSource extends Source{
     String id = keySplit[1];
     // make sure id has the correct type
     try {
-      getIdProperty().convert(id);
+      getIdProperty().convertToObject(id);
     }catch (Exception e) {
       String msg = String.format("Failed parsing id field \"%s\", value \"%s\", error=\"%s\"", getIdProperty().getName(), id, e.toString());
       GearsBuilder.log(msg, LogLevel.WARNING);
@@ -155,7 +155,7 @@ public class WriteSource extends Source{
         try {
           val = value.get(pd.getName());
           if(val != null) {
-            pd.convert(val);
+            pd.convertToObject(val);
             valuesToWrite.put(pd.getName(), val);
           }else if(!pd.isNullable()) {
             throw new Exception(String.format("mandatory \"%s\" value is not set", pd.getName()));
