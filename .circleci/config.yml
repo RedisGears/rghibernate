@@ -7,15 +7,15 @@ jobs:
   build:
     docker:
       - image: circleci/openjdk:11.0.7-jdk-buster
-      
+
       - image: circleci/mysql:8.0.4
         environment:
           MYSQL_ROOT_PASSWORD : my-secret-pw
-          MYSQL_ROOT_HOST: %          
+          MYSQL_ROOT_HOST: localhost
           MYSQL_DATABASE : hibernate_db
           MYSQL_USER: user
           MYSQL_PASSWORD: passw0rd
-      
+
     working_directory: ~/repo
 
     environment:
@@ -39,13 +39,13 @@ jobs:
           paths:
             - ~/.m2
           key: v1-dependencies-{{ checksum "pom.xml" }}
-        
+
       # run tests!
       - run: mvn pmd:check
       - run: mvn integration-test -DreuseForks=true -DchildDelegation=true
-      - run: mvn cobertura:cobertura          
-      - run: bash <(curl -s https://raw.githubusercontent.com/codecov/codecov-action/master/codecov) -t ${CODECOV_TOKEN}  
-                    
+      - run: mvn cobertura:cobertura
+      - run: bash <(curl -s https://raw.githubusercontent.com/codecov/codecov-action/master/codecov) -t ${CODECOV_TOKEN}
+
 workflows:
   version: 2
   commit:
