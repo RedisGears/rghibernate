@@ -48,6 +48,7 @@ public class RGHibernate implements Closeable, Serializable {
     return session;
   }
 
+  @SuppressWarnings("PMD.EmptyCatchBlock")
   public void recreateSession() {
     try {
       session.clear();
@@ -88,7 +89,7 @@ public class RGHibernate implements Closeable, Serializable {
 
   private void cancelTimer(Thread thread) throws Exception {
     // Timer::cancel
-    
+
     Field f = thread.getClass().getDeclaredField("queue");
     f.setAccessible(true);
     Object queue = f.get(thread);
