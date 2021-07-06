@@ -11,7 +11,7 @@ jobs:
       - image: circleci/mysql:8.0.4
         environment:
           MYSQL_ROOT_PASSWORD : my-secret-pw
-          MYSQL_ROOT_HOST: localhost
+          MYSQL_ROOT_HOST: %
           MYSQL_DATABASE : hibernate_db
           MYSQL_USER: user
           MYSQL_PASSWORD: passw0rd
