@@ -6,10 +6,11 @@
 
 	<class entity-name="Student" table="student">
 		<tuplizer entity-mode="dynamic-map" class="org.hibernate.tuple.entity.DynamicMapEntityTuplizer"/>
-      	<id name="id" type="string" length="50" column="id"/>
-      	<property name="firstName" column="first_name" type="string"/>
-      	<property name="lastName" column="last_name" type="string"/>
-      	<property name="email" column="email" type="string"/>
+	      	<id name="id" type="integer" length="50" column="id"/>
+	      	<property name="firstName" column="first_name" type="string"/>
+	      	<property name="lastName" column="last_name" type="string"/>
+	      	<property name="email" column="email" type="string" not-null="true"/>
+	      	<property name="age" column="age" type="integer"/>
 	</class>
 
 </hibernate-mapping>
