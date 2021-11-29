@@ -54,35 +54,17 @@ def create_connection(host, port, password, decode_responses=True):
 @click.option('--port', default=6379, type=int, help='Redis port to connect to')
 @click.option('--password', default=None, help='Redis password')
 @click.option('--rghibernate-jar', default='./target/rghibernate-0.0.3-SNAPSHOT-jar-with-dependencies.jar', help='Path to rghibernate jar file')
-@click.option('--rghibernate-connection-file', default='./src/test/resources/hibernate.cfg.xml', help='Path to rghibernate connection configuration file')
-@click.argument('mappings', nargs=-1, type=click.UNPROCESSED)
-def upload_recipe(host, port, password, rghibernate_jar, rghibernate_connection_file, mappings):
+def upload_recipe(host, port, password, rghibernate_jar):
     conn = create_connection(host, port, password)
-
-    if len(mappings) == 0:
-        print(Colors.Bred('no mapping given'))
-        return
 
     if not os.path.exists(rghibernate_jar):
         print(Colors.Bred('rghibernate jar file does not exists'))
         exit(1)
 
-    if not os.path.exists(rghibernate_connection_file):
-        print(Colors.Bred('rghibernate connection file does not exists'))
-        exit(1)
-
     with open(rghibernate_jar, 'rb') as f:
         data = f.read()
-        connectionXml = open(rghibernate_connection_file, 'rt').read()
-        mappingsXml = []
-        for mapping in mappings:
-            if not os.path.exists(mapping):
-                print(Colors.Bred('%s does not exists' % mapping))
-                exit(1)
-            with open(mapping, 'rt') as fd:
-                mappingsXml.append(fd.read())
         try:
-            res = conn.execute_command('rg.jexecute', 'com.redislabs.WriteBehind', data, connectionXml, *mappingsXml)
+            res = conn.execute_command('rg.jexecute', 'com.redislabs.WriteBehind', data)
         except Exception as e:
             print(Colors.Bred('Failed executing jexecute command. Aborting (%s)' % str(e).replace('|', '\n')))
             exit(1)
