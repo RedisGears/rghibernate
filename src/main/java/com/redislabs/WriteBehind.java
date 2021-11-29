@@ -2,326 +2,271 @@ package com.redislabs;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
-import java.util.stream.Stream;
-
-import org.hibernate.Session;
-import org.hibernate.Transaction;
-import org.hibernate.boot.Metadata;
-import org.hibernate.boot.MetadataSources;
-import org.hibernate.boot.registry.StandardServiceRegistry;
-import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
-import org.hibernate.mapping.PersistentClass;
-
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.type.TypeFactory;
 
 import gears.ExecutionMode;
 import gears.GearsBuilder;
-import gears.LogLevel;
-import gears.operations.AccumulateOperation;
-import gears.operations.ForeachOperation;
-import gears.records.KeysReaderRecord;
-import gears.readers.KeysReader;
-import gears.readers.StreamReader;
-import gears.readers.StreamReader.FailurePolicy;
+import gears.operations.FlatMapOperation;
+import gears.readers.CommandReader;
 
-public class WriteBehind implements Serializable {
-
-  private static final long serialVersionUID = 1L;
+public class WriteBehind{
   
-  static class MetaData implements Comparable<MetaData>, Serializable{
-    private static final long serialVersionUID = 1L;
+  public static final int VERSION = 103;
+  
+  public static class UpdateInfo{
     
-    String name = "JWriteBehind";
-    String desc = "Write behind java implementation";
-    String uuid = null;
-    int majorV = 99;
-    int minorV = 99;
-    int patchV = 99;
+    private Collection<Connector> connectors;
+    private Collection<Source> sources;
     
-    public String getUuid() {
-      return uuid;
-    }
-
-    public void setUuid(String uuid) {
-      this.uuid = uuid;
-    }
+    public UpdateInfo() {}
     
-    public String getName() {
-      return name;
+    public UpdateInfo(Collection<Connector> connectors, Collection<Source> sources) {
+      this.connectors = connectors;
+      this.sources = sources;
     }
 
-    public void setName(String name) {
-      this.name = name;
-    }
-
-    public String getDesc() {
-      return desc;
-    }
-
-    public void setDesc(String desc) {
-      this.desc = desc;
-    }
-
-    public int getMajorV() {
-      return majorV;
-    }
-
-    public void setMajorV(int majorV) {
-      this.majorV = majorV;
-    }
-
-    public int getMinorV() {
-      return minorV;
-    }
-
-    public void setMinorV(int minorV) {
-      this.minorV = minorV;
-    }
-
-    public int getPatchV() {
-      return patchV;
-    }
-
-    public void setPatchV(int patchV) {
-      this.patchV = patchV;
-    }
-    
-    @Override
-    public int compareTo(MetaData other) {
-      if(this.majorV == 99 && this.minorV == 99 && this.patchV == 99) {
-        return 1;
+    public Collection<Connector> getConnectors() {
+      if(connectors == null) {
+        return new ArrayList<>();
       }
-      
-      if(this.majorV != other.majorV) {
-        return this.majorV - other.majorV;
-      }
-      
-      if(this.minorV != other.minorV) {
-        return this.minorV - other.minorV;
-      }
-      
-      return this.patchV - other.patchV;
+      return connectors;
     }
-    
-    @Override
-    public boolean equals(Object other) {
-      return this.compareTo((MetaData) other) == 0;
+
+    public void setConnectors(Collection<Connector> connectors) {
+      this.connectors = connectors;
     }
-    
-    public String toString() {
-      return String.format("%s-%d.%d.%d", name, majorV, minorV, patchV);
+
+    public Collection<Source> getSources() {
+      if(sources == null) {
+        return new ArrayList<>();
+      }
+      return sources;
+    }
+
+    public void setSources(Collection<Source> sources) {
+      this.sources = sources;
     }
   }
   
-  private static String unregisterOldVersions(MetaData metaData) throws Exception {
-    GearsBuilder.log("Unregister old versions");
-    String uuid = null;
-    List<String> idsToUnregister = new ArrayList<>();
-    Object[] registrations = (Object[])GearsBuilder.execute("RG.DUMPREGISTRATIONS");
-    for(Object o : registrations) {
-      Object[] registration = (Object[])o;
-      String id = (String)registration[1];
-      String desc = (String)registration[5];
-      ObjectMapper objectMapper = new ObjectMapper();
-      MetaData md = null;
-      try {
-        md = objectMapper.readValue(desc, MetaData.class);
-      }catch (Exception e) {
-        GearsBuilder.log(e.toString(), LogLevel.WARNING);
-        continue;
-      }
-      
-      // we need this to make sure we are not leaking
-      objectMapper.getTypeFactory().clearCache();
-      
-      if(metaData.compareTo(md) <= 0) {
-        String msg = String.format("Found newer write behind version, curr_version='%s', found_versoin='%s'", metaData, md);
-        GearsBuilder.log(msg, LogLevel.WARNING);
-        throw new Exception(msg);
-      }
-      uuid = md.getUuid();
-      idsToUnregister.add(id);
-    }
-    
-    for(String id : idsToUnregister) {
-      GearsBuilder.log(String.format("Unregister %s",  id), LogLevel.WARNING);
-      String res = (String)GearsBuilder.execute("RG.UNREGISTER", id);
-      if(!res.equals("OK")) {
-        String msg = String.format("Failed unregister old registration, registration='%s', command_response='%s'", id, res);
-        GearsBuilder.log(msg, LogLevel.WARNING);
-        throw new Exception(msg);
-      }
-    }
-    
-    GearsBuilder.log("Done unregistered old versions");
-    
-    if(uuid == null) {
-      uuid = UUID.randomUUID().toString();
-    }
-    
-    return uuid;
+  public static String getUpgradeData() throws JsonProcessingException {
+    ObjectMapper objectMapper = new ObjectMapper();
+    String res = objectMapper.writeValueAsString(new UpdateInfo(Connector.getAllConnectors(), Source.getAllSources()));
+    objectMapper.getTypeFactory().clearCache();
+    TypeFactory.defaultInstance().clearCache();
+    return res;
   }
   
   public static void main(String[] args) throws Exception {
-    System.setProperty("javax.xml.bind.JAXBContextFactory", "org.eclipse.persistence.jaxb.JAXBContextFactory");
-    Thread.currentThread().setContextClassLoader(WriteBehind.class.getClassLoader());
     
-    if(args.length < 2) {
-      throw new Exception("Not enough arguments given");
+    if(args.length == 1 && args[0].equals("version")) {
+      int patch = VERSION % 100;
+      int minor = (VERSION / 100) % 100;
+      int major = (VERSION / 10000);
+      System.out.print(String.format("%d.%d.%d\r\n", major, minor, patch));
+      return;
     }
     
-    MetaData metaData = new MetaData();
-    
-    String uuid = unregisterOldVersions(metaData);
-
-    metaData.setUuid(uuid);
-    
-    ObjectMapper objectMapper = new ObjectMapper();
-    String registrationsDesc = objectMapper.writeValueAsString(metaData);
-    // we need this to make sure we are not leaking
-    objectMapper.getTypeFactory().clearCache();
-    
-    GearsBuilder.log(String.format("Register %s", registrationsDesc));
-    
-    String connectionXml = args[0];
-    
-    StandardServiceRegistry tempRegistry = new StandardServiceRegistryBuilder()
-        .configure( InMemoryURLFactory.getInstance().build("configuration", connectionXml))
-        .build();
-    
-    // Created Keys Readers
-    
-    for(int i = 1 ; i < args.length ; ++i) {
-      MetadataSources tempSources = new MetadataSources(tempRegistry);
-      tempSources.addURL(InMemoryURLFactory.getInstance().build("mapping", args[i]));
-      Metadata metadata = tempSources.getMetadataBuilder().build();
-      PersistentClass pc = metadata.getEntityBindings().iterator().next();
-      String enteryName = pc.getEntityName();
-      String idName = pc.getIdentifierProperty().getName();
+    UpdateInfo updateInfo = null;
+    Object[] sessions = (Object[])((Object[])GearsBuilder.execute("RG.JDUMPSESSIONS"))[1];
+    List<Object[]> oldVersions = Arrays.stream(sessions).map(Object[].class::cast).
+        filter(s->s[3].equals("com.redislabs.WriteBehind") && !s[9].toString().equals("0")).collect(Collectors.toList());
+    if(oldVersions.size() > 2) {
+      throw new Exception("Found more then one WriteBehind versions installed, fatal!!");
+    }
+    if(oldVersions.size() == 2) {
+      Object[] oldVersion = oldVersions.stream().filter(r-> (Long)r[5] < VERSION).findFirst().orElse(null);
+      if(oldVersion == null) {
+        throw new Exception("A newer version already exists");
+      }
       
-     
-      KeysReader reader = new KeysReader().
-          setPattern(enteryName + ":*").
-          setEventTypes(new String[] {"hset", "hmset", "del"});
-          
-      GearsBuilder.CreateGearsBuilder(reader, registrationsDesc).
-      foreach(new ForeachOperation<KeysReaderRecord>() {
-        
-        private static final long serialVersionUID = 1L;
-
-        private transient String streamName = String.format("_Stream-%s", uuid);
-        
-        protected Object readResolve() {
-          this.streamName = String.format("_Stream-%s", uuid);
-          return this;
-        }
-        
-        @Override
-        public void foreach(KeysReaderRecord record) throws Exception {
-          Map<String, String> value = record.getHashVal();
-          String key = record.getKey();
-          String[] keySplit = key.split(":");
-    
-          String[] command;
-          Stream<String> commandStream = Stream.of("XADD", String.format("%s-{%s}", streamName, GearsBuilder.hashtag()), "*", "entityName", keySplit[0], idName, keySplit[1], "event", record.getEvent());
-          if(record.getEvent().charAt(0) != 'd') {
-            Stream<String> fieldsStream = value.entrySet().stream()
-                .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue()));
+      GearsBuilder.log(String.format("upgrading from version %s", oldVersion[5].toString()));
       
-            command = Stream.concat(commandStream, fieldsStream).toArray(String[]::new);
-          }else {
-            command = commandStream.toArray(String[]::new);
-          }
-    
-          GearsBuilder.execute(command); // Write to stream    
+      String sessionId = (String)(oldVersion[1]);
+      String updateData = GearsBuilder.getSessionUpgradeData(sessionId);
+      GearsBuilder.log(String.format("Got update data from session %s", sessionId));
+      ObjectMapper objectMapper = new ObjectMapper();
+      objectMapper.registerSubtypes(ReadSource.class, WriteSource.class);
+      updateInfo = objectMapper.readValue(updateData, UpdateInfo.class);
+      objectMapper.getTypeFactory().clearCache();
+      TypeFactory.defaultInstance().clearCache();
+      
+      GearsBuilder.log("Unregister old registrations");
+      
+      if(updateInfo != null) {
+        for(Source s: updateInfo.getSources()) {
+          s.unregister();
         }
-        
-      }).register(ExecutionMode.SYNC, ()->System.setProperty("javax.xml.bind.JAXBContextFactory", "org.eclipse.persistence.jaxb.JAXBContextFactory"), ()->{});
+        for(Connector c: updateInfo.getConnectors()) {
+          c.unregister();
+        }
+      }
+      
+      GearsBuilder.log("Unregister managemen operations");
+      Object[] registrations = (Object[])GearsBuilder.execute("RG.DUMPREGISTRATIONS");
+      Arrays.stream(registrations).map(Object[].class::cast).filter(r->r[9].toString().contains(String.format("'SessionId':'%s'", sessionId)))
+      .forEach(r->GearsBuilder.execute("RG.UNREGISTER", r[1].toString()));
     }
     
-    tempRegistry.close();
+    // add connector registration
+    CommandReader newConnectorReader = new CommandReader().setTrigger("SYNC.REGISTERCONNECTOR");
+    GearsBuilder.CreateGearsBuilder(newConnectorReader, "Register a new connector").
+    map(r->{
+      String connectorName = new String((byte[])r[1]);
+      String connectorXml = new String((byte[])r[5]);
+      int batchSize = Integer.parseInt(new String((byte[])r[2]));
+      int duration = Integer.parseInt(new String((byte[])r[3]));
+      int retryInterval = Integer.parseInt(new String((byte[])r[4]));
+      if(Connector.getConnector(connectorName)!=null) {
+        throw new Exception("connector already exists");
+      }
+      new Connector(connectorName, connectorXml, batchSize, duration, retryInterval);
+      return "OK";
+    }).register(ExecutionMode.SYNC);
     
-    
-    // Created Stream Reader
-    
-    RGHibernate rghibernate = new RGHibernate(args);
-    
-    StreamReader streamReader = new StreamReader()
-        .setPattern(String.format("_Stream-%s-*", uuid))
-        .setBatchSize(100)
-        .setDuration(1000)
-        .setFailurePolicy(FailurePolicy.RETRY)
-        .setFailureRertyInterval(5);
-
-    GearsBuilder.CreateGearsBuilder(streamReader, registrationsDesc).
-    accumulate(new AccumulateOperation<HashMap<String,Object>, ArrayList<HashMap<String, Object>>>() {
-
+    // add source registration
+    CommandReader newSourceReader = new CommandReader().setTrigger("SYNC.REGISTERSOURCE");
+    GearsBuilder.CreateGearsBuilder(newSourceReader, "Registe a new source").
+    map(r->{
+      String sourceName = new String((byte[])r[1]);
+      String connectorName = new String((byte[])r[2]);
+      String writePolicy = new String((byte[])r[3]);
+      int timeout = 0;
+      String sourceXml = null;
+      boolean isWrite = true;
+      boolean writeThrough = false;
+      if(writePolicy.equals("WriteThrough")) {
+        isWrite = true;
+        writeThrough = true;
+        try {
+          timeout = Integer.parseInt(new String((byte[])r[4]));
+        }catch (Exception e) {
+          throw new Exception("Could not parse timeout argument");
+        }
+        sourceXml = new String((byte[])r[5]);
+      }else if(writePolicy.equals("WriteBehind")) {
+        isWrite = true;
+        writeThrough = false;
+        sourceXml = new String((byte[])r[4]);
+      }else if(writePolicy.equals("ReadThrough")) {
+        isWrite = false;
+        try {
+          timeout = Integer.parseInt(new String((byte[])r[4]));
+        }catch (Exception e) {
+          throw new Exception("Could not parse expire argument");
+        }
+        sourceXml = new String((byte[])r[5]);
+      } else {
+        throw new Exception("Write policy should be either WriteThrough/WriteBehind/ReadThrough");
+      }
       
+      if(WriteSource.getSource(sourceName) != null) {
+        throw new Exception("source already exists");
+      }
+      Connector c = Connector.getConnector(connectorName);
+      if(c == null) {
+        throw new Exception("connector does not exists");
+      }
+      Source s = null;
+      if (isWrite) {
+        s = new WriteSource(sourceName, connectorName, sourceXml, writeThrough, timeout);
+      }else {
+        s = new ReadSource(sourceName, connectorName, sourceXml, timeout);
+      }
+      c.addSource(s);
+      return "OK";
+    }).register(ExecutionMode.SYNC);
+    
+    // remove source
+    CommandReader newRemoveSourceReader = new CommandReader().setTrigger("SYNC.UNREGISTERSOURCE");
+    GearsBuilder.CreateGearsBuilder(newRemoveSourceReader, "Unregiste source").
+    map(r->{
+      String sourceName = new String((byte[])r[1]);
+      Source s = WriteSource.getSource(sourceName);
+      if(s == null) {
+        throw new Exception("source does exists");
+      }
+      s.unregister();
+      return "OK";
+    }).register(ExecutionMode.SYNC);
+    
+    // remove connector
+    CommandReader newRemoveConnectorReader = new CommandReader().setTrigger("SYNC.UNREGISTERCONNECTOR");
+    GearsBuilder.CreateGearsBuilder(newRemoveConnectorReader, "Unregiste connector").
+    map(r->{
+      String connectorName = new String((byte[])r[1]);
+      Connector c = Connector.getConnector(connectorName);
+      if(c == null) {
+        throw new Exception("connector does exists");
+      }
+      c.unregister();
+      return "OK";
+    }).register(ExecutionMode.SYNC);
+    
+    // general information
+    CommandReader syncInfoReader = new CommandReader().setTrigger("SYNC.INFO");
+    GearsBuilder.CreateGearsBuilder(syncInfoReader, "General info about sync").
+    flatMap(new FlatMapOperation<Object[], Serializable>() {
+
+      /**
+       * 
+       */
       private static final long serialVersionUID = 1L;
 
       @Override
-      public ArrayList<HashMap<String, Object>> accumulate(ArrayList<HashMap<String, Object>> a,
-          HashMap<String, Object> r) throws Exception {
+      public Iterable<Serializable> flatmap(Object[] r) throws Exception {
+        String subInfoCommand = null;
         
-        if(a == null) {
-          a = new ArrayList<>();
+        if(r.length > 1) {
+          subInfoCommand = new String((byte[])r[1]);
         }
-        a.add(r);
-        return a;
-      }
-      
-    }).
-    foreach(records -> {
-      
-      try {
-        Session session = rghibernate.getSession();
-        Transaction transaction = session.beginTransaction();
-        boolean isMerge = true;
         
-        for(Map<String, Object> r: records) {
-          Map<String, byte[]> value = (Map<String, byte[]>) r.get("value");
-  
-          Map<String, String> map = value.entrySet().stream()
-              .collect(Collectors.toMap(Map.Entry::getKey, e -> new String(e.getValue())));
+        if("CONNECTORS".equals(subInfoCommand)) {
+          return Connector.getAllConnectors().stream().map(Serializable.class::cast).collect(Collectors.toList());
+        }
+        
+        if("SOURCES".equals(subInfoCommand)) {
+          return WriteSource.getAllSources().stream().map(Serializable.class::cast).collect(Collectors.toList());
+        }
+        
+        if("GENERAL".equals(subInfoCommand)) {
+          LinkedList<Serializable> res = new LinkedList<>();
+          res.push("NConnector");
+          res.push(Integer.toString(Connector.getAllConnectors().size()));
+          res.push("NSources");
+          res.push(Integer.toString(WriteSource.getAllSources().size()));
           
-          String event = map.remove("event");
-          if(event.charAt(0) != 'd') {
-            if(!isMerge) {
-              transaction.commit();
-              session.clear();
-              transaction = session.beginTransaction();
-              isMerge = true;
-            }
-            session.merge(map.remove("entityName"), map);
-          }else {
-            if(isMerge) {
-              transaction.commit();
-              session.clear();
-              transaction = session.beginTransaction();
-              isMerge = false;
-            }
-            session.delete(map.remove("entityName"), map);
-          }
+          return res;
         }
         
-        transaction.commit();
-        session.clear();
-      }catch (Exception e) {
-        rghibernate.recreateSession();
-        throw e;
+        throw new Exception("no such option");
       }
-    }).
-    map(ArrayList<HashMap<String, Object>>::size).
-    register(ExecutionMode.ASYNC_LOCAL, () -> {
-      System.setProperty("javax.xml.bind.JAXBContextFactory", "org.eclipse.persistence.jaxb.JAXBContextFactory");
-      Thread.currentThread().setContextClassLoader(WriteBehind.class.getClassLoader());
-      rghibernate.generateSession();
-    }, rghibernate::close);
+      
+    }).register(ExecutionMode.SYNC);
+    
+    if(updateInfo != null) {
+      GearsBuilder.log("Upgrade registrations");
+      
+      for(Connector c: updateInfo.getConnectors()) {
+        new Connector(c.getName(), c.getXmlDef(), c.getBatchSize(), c.getDuration(), c.getRetryInterval());
+      }
+      
+      for(Source temp: updateInfo.getSources()) {
+        if(temp instanceof WriteSource) {
+          WriteSource s = (WriteSource)temp;
+          new WriteSource(s.getName(), s.getConnector(), s.getXmlDef(), s.isWriteThrough(), s.getTimeout());
+        } else if(temp instanceof ReadSource) {
+          ReadSource s = (ReadSource)temp;
+          new ReadSource(s.getName(), s.getConnector(), s.getXmlDef(), s.getExpire());
+        }
+      }
+    }
   }
 }

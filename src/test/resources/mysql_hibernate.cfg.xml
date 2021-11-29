@@ -4,11 +4,11 @@
         
 <hibernate-configuration>
 	<session-factory>
-		<property name="hibernate.connection.driver_class">oracle.jdbc.driver.OracleDriver</property>
-		<property name="hibernate.connection.url">jdbc:oracle:thin:@localhost:1521:xe</property>
-        <property name="hibernate.connection.username">system</property>
-        <property name="hibernate.connection.password">oracle</property>
-		<property name="hibernate.dialect">org.hibernate.dialect.OracleDialect</property>
+		<!-- JDBC Database connection settings -->
+		<property name="connection.driver_class">org.mariadb.jdbc.Driver</property>
+		<property name="connection.url">jdbc:mysql://localhost:3306/test?allowPublicKeyRetrieval=true&amp;useSSL=false</property>
+		<property name="connection.username">demouser</property>
+		<property name="connection.password">Password123!</property>
 		<!-- JDBC connection pool settings ... using built-in test pool -->
 		<property name="connection.pool_size">1</property>
 		<!-- Should echo the SQL to stdout? -->
