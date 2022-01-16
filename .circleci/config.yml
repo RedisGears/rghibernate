@@ -25,15 +25,14 @@ jobs:
             /bin/bash ./setup-mysql
       - run:
             name: Install Redis
-            command: python3 ./deps/readies/bin/getredis --version 6
+            command: python3 ./deps/readies/bin/getredis --version 6.2
       - run:
-            name: Install RLTest
-            command: python3 -m pip install --no-cache-dir git+https://github.com/RedisLabsModules/RLTest.git@master
+            name: Install test dependencies
+            command: |
+              python3 -m pip install -r pytest/requirements.txt
       - run:
           name: Test
-          command: |
-            python3 -m pip install --no-cache-dir sqlalchemy~=1.3.0 PyMySQL cryptography
-            make tests
+          command: make tests
       - persist_to_workspace:
           root: artifacts
           paths:
