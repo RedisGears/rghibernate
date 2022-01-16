@@ -3,7 +3,7 @@ GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 $(info OS=$(OS))
 
 all: build
-	
+
 installRedisGears:
 	OS=$(OS) /bin/bash ./Install_RedisGears.sh
 
