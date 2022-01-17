@@ -1,3 +1,4 @@
+import os
 from RLTest import Env
 from sqlalchemy import create_engine
 from sqlalchemy.sql import text
@@ -142,7 +143,12 @@ class genericTest:
 
         self.dbConn = self.backend.getDBConn()
 
-        self.env = Env(module='../bin/RedisGears/redisgears.so', moduleArgs='CreateVenv 1 pythonInstallationDir ../../bin/RedisGears/ Plugin ../../bin/RedisGears_JVMPlugin/plugin/gears_jvm.so JvmOptions -Djava.class.path=../../bin/RedisGears_JVMPlugin/gears_runtime/target/gear_runtime-jar-with-dependencies.jar JvmPath ../../bin/RedisGears_JVMPlugin/bin/OpenJDK/jdk-11.0.9.1+1/')
+        if os.path.isfile('/var/opt/redislabs/lib/modules/redisgears.so'):
+            modpath = '/var/opt/redislabs/lib/modules/redisgears.so'
+        else:
+            modpath = '../bin/RedisGears/redisgears.so'
+
+        self.env = Env(module=modpath, moduleArgs='CreateVenv 1 pythonInstallationDir ../../bin/RedisGears/ Plugin ../../bin/RedisGears_JVMPlugin/plugin/gears_jvm.so JvmOptions -Djava.class.path=../../bin/RedisGears_JVMPlugin/gears_runtime/target/gear_runtime-jar-with-dependencies.jar JvmPath ../../bin/RedisGears_JVMPlugin/bin/OpenJDK/jdk-11.0.9.1+1/')
         with open('../target/rghibernate-jar-with-dependencies.jar', 'rb') as f:
             self.env.cmd('RG.JEXECUTE', 'com.redislabs.WriteBehind', f.read())
 
