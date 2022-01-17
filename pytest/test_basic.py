@@ -57,10 +57,10 @@ class TimeLimit(object):
 
 class MysqlBackend:
     def __init__(self):
-        if os.path.isfile('/usr/sbin/mysqld'):
-            service = 'mysql-server'
-        else:
+        if os.path.isfile('/usr/sbin/mariadbd'):
             service = 'mariadb'
+        else:
+            service = 'mysql-server'
         self.SERVICE = service
         subprocess.Popen(['/bin/bash', 'service', self.SERVICE, 'restart'], stdout=subprocess.PIPE).wait()
 
