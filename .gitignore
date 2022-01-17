@@ -28,3 +28,7 @@ hs_err_pid*
 target/
 
 /bin/
+
+**/logs/
+**/__pycache__
+*.rdb

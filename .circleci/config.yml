@@ -3,7 +3,7 @@ version: 2.1
 jobs:
   build-and-test-ubuntu:
     docker:
-      - image: 'ubuntu:bionic'
+      - image: 'redislabs/redisgears:edge'
     steps:
       - run:
           name: Setup executor
@@ -20,12 +20,9 @@ jobs:
           name: Install and Configure mysql
           command: |
             apt-get update
-            apt-get install -y mysql-server
-            service mysql start
+            apt-get install -y mariadb-server-10.5
+            service mariadb start
             /bin/bash ./setup-mysql
-      - run:
-            name: Install Redis
-            command: python3 ./deps/readies/bin/getredis --version 6.2
       - run:
             name: Install test dependencies
             command: |
@@ -48,6 +45,7 @@ jobs:
         - run:
             name: Deploy Snapshots to S3
             command: |
+              python3 -m pip install awscli
               for f in artifacts/snapshot/*.jar; do
                 aws s3 cp $f s3://redismodules/rghibernate/snapshots/ --acl public-read
               done
@@ -60,6 +58,8 @@ jobs:
         - run:
             name: Deploy Snapshots to S3
             command: |
+              python3 -m pip install awscli
+              for f in artifacts/snapshot/*.jar; do
               for f in artifacts/release/*.jar; do
                 aws s3 cp $f s3://redismodules/rghibernate/ --acl public-read
               done
