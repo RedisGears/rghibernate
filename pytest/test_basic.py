@@ -1,3 +1,4 @@
+import os
 from RLTest import Env
 from sqlalchemy import create_engine
 from sqlalchemy.sql import text
@@ -56,13 +57,18 @@ class TimeLimit(object):
 
 class MysqlBackend:
     def __init__(self):
-        subprocess.Popen(['/bin/bash', 'service', 'mysql', 'restart'], stdout=subprocess.PIPE).wait()
+        if os.path.isfile('/usr/sbin/mariadbd'):
+            service = 'mariadb'
+        else:
+            service = 'mysql-server'
+        self.SERVICE = service
+        subprocess.Popen(['/bin/bash', 'service', self.SERVICE, 'restart'], stdout=subprocess.PIPE).wait()
 
     def disconnect(self):
-        subprocess.Popen(['/bin/bash', 'service', 'mysql', 'stop'], stdout=subprocess.PIPE).wait()
+        subprocess.Popen(['/bin/bash', 'service', self.SERVICE, 'stop'], stdout=subprocess.PIPE).wait()
 
     def connect(self):
-        subprocess.Popen(['/bin/bash', 'service', 'mysql', 'start'], stdout=subprocess.PIPE).wait()
+        subprocess.Popen(['/bin/bash', 'service', self.SERVICE, 'start'], stdout=subprocess.PIPE).wait()
 
     def getDBConn(self):
         return self.getConnection()
@@ -79,7 +85,7 @@ class MysqlBackend:
     def getConnection(self):
         while True:
             try:
-                return self.connectToDB() 
+                return self.connectToDB()
             except Exception as e:
                 print(e)
                 time.sleep(1)
@@ -106,7 +112,7 @@ class OracleBackend:
                 container = [container for container in self.client.containers.list() if container.attrs['Config']['Image'] == 'quay.io/maksymbilenko/oracle-12c']
         else:
             print('Oracle container already running')
-    
+
         return container[0]
 
     def disconnect(self):
@@ -130,19 +136,24 @@ class OracleBackend:
     def getConnection(self):
         while True:
             try:
-                return self.connectToDB() 
+                return self.connectToDB()
             except Exception as e:
                 time.sleep(1)
 
 
 class genericTest:
     def __init__(self, writePolicy, retryInterval=5, timeout=10, db=MYSQL_DB):
-        
+
         self.backend = OracleBackend() if db == ORACLESQL_DB else MysqlBackend()
 
         self.dbConn = self.backend.getDBConn()
 
-        self.env = Env(module='../bin/RedisGears/redisgears.so', moduleArgs='CreateVenv 1 pythonInstallationDir ../../bin/RedisGears/ Plugin ../../bin/RedisGears_JVMPlugin/plugin/gears_jvm.so JvmOptions -Djava.class.path=../../bin/RedisGears_JVMPlugin/gears_runtime/target/gear_runtime-jar-with-dependencies.jar JvmPath ../../bin/RedisGears_JVMPlugin/bin/OpenJDK/jdk-11.0.9.1+1/')
+        if os.path.isfile('/var/opt/redislabs/lib/modules/redisgears.so'):
+            modpath = '/var/opt/redislabs/lib/modules/redisgears.so'
+        else:
+            modpath = '../bin/RedisGears/redisgears.so'
+
+        self.env = Env(module=modpath, moduleArgs='CreateVenv 1 pythonInstallationDir ../../bin/RedisGears/ Plugin ../../bin/RedisGears_JVMPlugin/plugin/gears_jvm.so JvmOptions -Djava.class.path=../../bin/RedisGears_JVMPlugin/gears_runtime/target/gear_runtime-jar-with-dependencies.jar JvmPath ../../bin/RedisGears_JVMPlugin/bin/OpenJDK/jdk-11.0.9.1+1/')
         with open('../target/rghibernate-jar-with-dependencies.jar', 'rb') as f:
             self.env.cmd('RG.JEXECUTE', 'com.redislabs.WriteBehind', f.read())
 
@@ -231,7 +242,7 @@ class testWriteBehind(genericTest):
 
         for i in range(100):
             self.env.cmd('del', 'Student:%d' % i)
-        
+
 
         with TimeLimit(10, self.env, 'Failed waiting for data to delete from db'):
             while res is not None:
@@ -248,11 +259,11 @@ class testWriteBehind(genericTest):
             self.env.cmd('hmset', 'Student:%d' % i, 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10')
             if i == 50:
                 self.disconnectBackend()
-        
+
         self.connectBackend()
 
         self.dbConn = self.backend.getDBConn()
-        
+
         # make sure all data was written
         result = None
         res = None
@@ -302,11 +313,11 @@ class testWriteThrough(genericTest):
             self.env.assertTrue(False, message='got results when expecting no results')
         except Exception:
             pass
-        
+
     def testSimpleWriteThrough2(self):
         for i in range(100):
             self.env.cmd('hmset', 'Student:%d' % i, 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '10')
-        
+
         result = self.dbConn.execute(text('select count(*) from student'))
         res = result.next()
 
@@ -314,7 +325,7 @@ class testWriteThrough(genericTest):
 
         for i in range(100):
             self.env.cmd('del', 'Student:%d' % i)
-        
+
 
         result = self.dbConn.execute(text('select * from student'))
         try:
@@ -420,7 +431,7 @@ class testWriteThrough(genericTest):
 
         self.env.assertEqual(res, (1, None, 'bar', 'email', 10))
 
-        self.env.cmd('hsetnx', 'Student:1', 'firstName', 'foo')        
+        self.env.cmd('hsetnx', 'Student:1', 'firstName', 'foo')
 
         result = self.dbConn.execute(text('select * from student'))
         res = result.next()

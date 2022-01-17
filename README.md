@@ -98,7 +98,7 @@ Now we need to upload our mapping xml for WriteBehind (we call it a source that 
 
 </hibernate-mapping>
 ```
-Notice, the `entity-name` will be used has key prefix on the Redis hash and the id will be the value that follow the key prefix. In our example the hash `Student:1` will be mapped to table `student` and the `id` value will be `1` (the `:` is not part of entity name and are added automatically). We will upload our source like this:
+Notice, the `entity-name` will be used as key prefix on the Redis hash and the id will be the value that follow the key prefix. In our example the hash `Student:1` will be mapped to table `student` and the `id` value will be `1` (the `:` is not part of entity name and are added automatically). We will upload our source like this:
 ```
 > redis-cli -x RG.TRIGGER SYNC.REGISTERSOURCE StudentWrite mysql WriteBehind < src/test/resources/Student.hbm.xml 
 1) "OK"
