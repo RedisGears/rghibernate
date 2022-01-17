@@ -1,16 +1,17 @@
 OS=$(shell ./deps/readies/bin/platform --osnick)
+ifdef CIRCLE_PR_NUMBER
+GIT_BRANCH=pullrequest-$(CIRCLE_PR_NUMBER)
+else
 GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
+endif
 $(info OS=$(OS))
 
 all: build
-	
-installRedisGears:
-	OS=$(OS) /bin/bash ./Install_RedisGears.sh
 
 installJVMPlugin:
 	OS=bionic /bin/bash ./Install_JVMPlugin.sh
 
-build: installRedisGears installJVMPlugin
+build: installJVMPlugin
 	mvn -Dmaven.test.skip=true package
 	mkdir -p ./artifacts/snapshot/
 	mkdir -p ./artifacts/release/
