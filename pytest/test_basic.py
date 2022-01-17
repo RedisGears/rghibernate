@@ -57,13 +57,18 @@ class TimeLimit(object):
 
 class MysqlBackend:
     def __init__(self):
-        subprocess.Popen(['/bin/bash', 'service', 'mariadb', 'restart'], stdout=subprocess.PIPE).wait()
+        if os.path.isfile('/usr/sbin/mysqld'):
+            service = 'mysql-server'
+        else:
+            service = 'mariadb'
+        self.SERVICE = service
+        subprocess.Popen(['/bin/bash', 'service', self.SERVICE, 'restart'], stdout=subprocess.PIPE).wait()
 
     def disconnect(self):
-        subprocess.Popen(['/bin/bash', 'service', 'mariadb', 'stop'], stdout=subprocess.PIPE).wait()
+        subprocess.Popen(['/bin/bash', 'service', self.SERVICE, 'stop'], stdout=subprocess.PIPE).wait()
 
     def connect(self):
-        subprocess.Popen(['/bin/bash', 'service', 'mariadb', 'start'], stdout=subprocess.PIPE).wait()
+        subprocess.Popen(['/bin/bash', 'service', self.SERVICE, 'start'], stdout=subprocess.PIPE).wait()
 
     def getDBConn(self):
         return self.getConnection()
