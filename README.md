@@ -36,6 +36,10 @@ Read-Through implementation that mainly register on key-miss notification and go
 * Install build essential
 
 ### Build
+Afer downloading rghibernate, run that command in the downloaded folder to get the submodules:
+```
+git submodule update --init --recursive
+```
 Execute `make build`, when finished you will find the compile jar `artifacts/release/rghibernate-<version>-jar-with-dependencies.jar`
 
 ### Example
