@@ -31,6 +31,9 @@ jobs:
       - run:
           name: Test
           command: make tests
+      - run:
+          name: deploy maven artifact
+          command: mvn -s .circleci.settings.xml -DskipTests deploy
       - persist_to_workspace:
           root: artifacts
           paths:
