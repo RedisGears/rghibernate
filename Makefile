@@ -1,4 +1,4 @@
-OS=$(shell ./deps/readies/bin/platform --osnick)
+OS?=$(shell ./deps/readies/bin/platform --osnick)
 ifdef CIRCLE_PR_NUMBER
 GIT_BRANCH=pullrequest-$(CIRCLE_PR_NUMBER)
 else

@@ -153,7 +153,11 @@ class genericTest:
         else:
             modpath = '../bin/RedisGears/redisgears.so'
 
-        self.env = Env(module=modpath, moduleArgs='CreateVenv 1 pythonInstallationDir ../../bin/RedisGears/ Plugin ../../bin/RedisGears_JVMPlugin/plugin/gears_jvm.so JvmOptions -Djava.class.path=../../bin/RedisGears_JVMPlugin/gears_runtime/target/gear_runtime-jar-with-dependencies.jar JvmPath ../../bin/RedisGears_JVMPlugin/bin/OpenJDK/jdk-11.0.9.1+1/')
+        pluginPath = '/var/opt/redislabs/modules/rg/plugin/gears_jvm.so'
+        jvmOptions = '-Djava.class.path=/var/opt/redislabs/modules/rg/gear_runtime-jar-with-dependencies.jar'
+        jvmDir = '/var/opt/redislabs/modules/rg/OpenJDK/jdk-11.0.9.1+1'
+
+        self.env = Env(module=modpath, moduleArgs='Plugin %s JvmOptions %s JvmPath %s' % (pluginPath, jvmOptions, jvmDir))
         with open('../target/rghibernate-jar-with-dependencies.jar', 'rb') as f:
             self.env.cmd('RG.JEXECUTE', 'com.redislabs.WriteBehind', f.read())
 
@@ -484,7 +488,6 @@ class testWriteThrough(genericTest):
                 self.env.cmd('RG.TRIGGER', 'SYNC.REGISTERCONNECTOR', 'oracle_connector', '10', '10', '5', f.read())
             except Exception as e:
                 print(e)
-                input('stopped')
 
         # reregister student source
         with open('../src/test/resources/Student.hbm.xml', 'rt') as f:
@@ -492,7 +495,6 @@ class testWriteThrough(genericTest):
                 self.env.cmd('RG.TRIGGER', 'SYNC.REGISTERSOURCE', 'students_src', 'oracle_connector', 'WriteThrough', '10', f.read())
             except Exception as e:
                 print(e)
-                input('stopped')
 
         for _ in self.reloadingIterator():
             self.env.cmd('hset', 'Student:1', 'firstName', 'foo', 'lastName', 'bar', 'email', 'email', 'age', '11')
