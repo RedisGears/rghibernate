@@ -9,7 +9,7 @@ $(info OS=$(OS))
 all: build
 
 installJVMPlugin:
-	OS=bionic /bin/bash ./Install_JVMPlugin.sh
+	OS=ubuntu18.04 /bin/bash ./Install_JVMPlugin.sh
 
 build: installJVMPlugin
 	mvn -Dmaven.test.skip=true package
