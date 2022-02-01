@@ -85,7 +85,7 @@ public class WriteBehind{
   public static void main(String[] args) throws Exception {
     String verStr = getStringVersion(VERSION);
     if(args.length == 1 && args[0].equals("version")) {
-      System.out.print(String.format("RGHibernate %s\r\n", verStr));
+      System.out.print(String.format("%s\r\n", verStr));
       return;
     }
     GearsBuilder.log(String.format("RGHibernate %s", verStr));
