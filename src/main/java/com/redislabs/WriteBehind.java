@@ -244,10 +244,12 @@ public class WriteBehind{
       GearsBuilder.log("Upgrade registrations");
       
       for(Connector c: updateInfo.getConnectors()) {
+        GearsBuilder.log(String.format("Register connector %s", c.getName()));
         new Connector(c.getName(), c.getXmlDef(), c.getBatchSize(), c.getDuration(), c.getRetryInterval());
       }
       
       for(Source temp: updateInfo.getSources()) {
+        GearsBuilder.log(String.format("Register source %s to connector %s", temp.getName(), temp.getConnector()));
         if(temp instanceof WriteSource) {
           WriteSource s = (WriteSource)temp;
           new WriteSource(s.getName(), s.getConnector(), s.getXmlDef(), s.isWriteThrough(), s.getTimeout());
