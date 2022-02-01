@@ -8,7 +8,7 @@ set -x
 redis-server --loadmodule ./bin/RedisGears/redisgears.so \
        Plugin /var/opt/redislabs/modules/rg/plugin/gears_jvm.so \
        JvmOptions "-Djava.class.path=/var/opt/redislabs/modules/rg/gear_runtime-jar-with-dependencies.jar -Xmx16m" \
-       JvmPath /var/opt/redislabs/modules/rg/OpenJDK/jdk-11.0.9.1+1//lib/server/libjvm.so&
+       JvmPath /var/opt/redislabs/modules/rg/OpenJDK/jdk-11.0.9.1+1/&
 
 #valgrind --suppressions=/home/meir/work/JVMPlugin/pytest/leakcheck.supp redis-server --loadmodule ./bin/RedisGears/redisgears.so CreateVenv 1 pythonInstallationDir ./bin/RedisGears/ \
 #	Plugin ./bin/RedisGears_JVMPlugin/plugin/gears_jvm.so \
