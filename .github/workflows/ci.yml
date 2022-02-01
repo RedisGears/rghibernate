@@ -21,7 +21,7 @@ jobs:
           mysql user: 'demouser'
           mysql password: 'Password123!'
           mysql database: 'test'
-          mariadb_version: '10.5'
+          mariadb version: '10.5'
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
         with:
