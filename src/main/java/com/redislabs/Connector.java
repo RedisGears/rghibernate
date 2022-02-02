@@ -148,6 +148,10 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     .foreach(this)
     .map(ArrayList<HashMap<String, Object>>::size)
     .register(ExecutionMode.ASYNC_LOCAL, this, this);
+    
+    connector = RGHibernate.getOrCreate(name);
+    connector.setXmlConf(xmlDef);
+    connectors.put(this.name, this);
   }
   
   public String getUuid() {

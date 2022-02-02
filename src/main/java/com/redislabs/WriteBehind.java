@@ -19,21 +19,32 @@ import gears.readers.CommandReader;
 
 public class WriteBehind{
   
-  public static final int VERSION = 103;
+  public static final int VERSION = 0x00000100;
+  public static final String DESCRIPTION = "A write behind/read through recipe for RedisGears JVM leverage hibernate for external db conectivity.";
   
   public static class UpdateInfo{
     
+	private int version;
     private Collection<Connector> connectors;
     private Collection<Source> sources;
     
     public UpdateInfo() {}
     
-    public UpdateInfo(Collection<Connector> connectors, Collection<Source> sources) {
+    public UpdateInfo(int version, Collection<Connector> connectors, Collection<Source> sources) {
+      this.version = version;
       this.connectors = connectors;
       this.sources = sources;
     }
 
-    public Collection<Connector> getConnectors() {
+    public int getVersion() {
+		return version;
+	}
+
+	public void setVersion(int version) {
+		this.version = version;
+	}
+
+	public Collection<Connector> getConnectors() {
       if(connectors == null) {
         return new ArrayList<>();
       }
@@ -58,61 +69,39 @@ public class WriteBehind{
   
   public static String getUpgradeData() throws JsonProcessingException {
     ObjectMapper objectMapper = new ObjectMapper();
-    String res = objectMapper.writeValueAsString(new UpdateInfo(Connector.getAllConnectors(), Source.getAllSources()));
+    String res = objectMapper.writeValueAsString(new UpdateInfo(VERSION, Connector.getAllConnectors(), Source.getAllSources()));
     objectMapper.getTypeFactory().clearCache();
     TypeFactory.defaultInstance().clearCache();
     return res;
   }
   
+  public static String getStringVersion(int version) {
+    int patch = version & 0x000000FF;
+    int minor = ((version & 0x0000FF00) >> 8);
+    int major = ((version & 0x00FF0000) >> 16);
+    return String.format("%d.%d.%d", major, minor, patch);
+  }
+  
   public static void main(String[] args) throws Exception {
-    
+    String verStr = getStringVersion(VERSION);
     if(args.length == 1 && args[0].equals("version")) {
-      int patch = VERSION % 100;
-      int minor = (VERSION / 100) % 100;
-      int major = (VERSION / 10000);
-      System.out.print(String.format("%d.%d.%d\r\n", major, minor, patch));
+      System.out.print(String.format("%s\r\n", verStr));
       return;
     }
+    GearsBuilder.log(String.format("RGHibernate %s", verStr));
     
+    String updateData = GearsBuilder.getUpgradeData();
     UpdateInfo updateInfo = null;
-    Object[] sessions = (Object[])((Object[])GearsBuilder.execute("RG.JDUMPSESSIONS"))[1];
-    List<Object[]> oldVersions = Arrays.stream(sessions).map(Object[].class::cast).
-        filter(s->s[3].equals("com.redislabs.WriteBehind") && !s[9].toString().equals("0")).collect(Collectors.toList());
-    if(oldVersions.size() > 2) {
-      throw new Exception("Found more then one WriteBehind versions installed, fatal!!");
+    if (updateData != null) {
+    	ObjectMapper objectMapper = new ObjectMapper();
+    	objectMapper.registerSubtypes(ReadSource.class, WriteSource.class);
+    	updateInfo = objectMapper.readValue(updateData, UpdateInfo.class);
+    	objectMapper.getTypeFactory().clearCache();
+    	TypeFactory.defaultInstance().clearCache();
     }
-    if(oldVersions.size() == 2) {
-      Object[] oldVersion = oldVersions.stream().filter(r-> (Long)r[5] < VERSION).findFirst().orElse(null);
-      if(oldVersion == null) {
-        throw new Exception("A newer version already exists");
-      }
-      
-      GearsBuilder.log(String.format("upgrading from version %s", oldVersion[5].toString()));
-      
-      String sessionId = (String)(oldVersion[1]);
-      String updateData = GearsBuilder.getSessionUpgradeData(sessionId);
-      GearsBuilder.log(String.format("Got update data from session %s", sessionId));
-      ObjectMapper objectMapper = new ObjectMapper();
-      objectMapper.registerSubtypes(ReadSource.class, WriteSource.class);
-      updateInfo = objectMapper.readValue(updateData, UpdateInfo.class);
-      objectMapper.getTypeFactory().clearCache();
-      TypeFactory.defaultInstance().clearCache();
-      
-      GearsBuilder.log("Unregister old registrations");
-      
-      if(updateInfo != null) {
-        for(Source s: updateInfo.getSources()) {
-          s.unregister();
-        }
-        for(Connector c: updateInfo.getConnectors()) {
-          c.unregister();
-        }
-      }
-      
-      GearsBuilder.log("Unregister managemen operations");
-      Object[] registrations = (Object[])GearsBuilder.execute("RG.DUMPREGISTRATIONS");
-      Arrays.stream(registrations).map(Object[].class::cast).filter(r->r[9].toString().contains(String.format("'SessionId':'%s'", sessionId)))
-      .forEach(r->GearsBuilder.execute("RG.UNREGISTER", r[1].toString()));
+    
+    if (updateInfo != null) {
+    	GearsBuilder.log(String.format("Upgrade from version %s", getStringVersion(updateInfo.getVersion())));
     }
     
     // add connector registration
@@ -255,10 +244,12 @@ public class WriteBehind{
       GearsBuilder.log("Upgrade registrations");
       
       for(Connector c: updateInfo.getConnectors()) {
+        GearsBuilder.log(String.format("Register connector %s", c.getName()));
         new Connector(c.getName(), c.getXmlDef(), c.getBatchSize(), c.getDuration(), c.getRetryInterval());
       }
       
       for(Source temp: updateInfo.getSources()) {
+        GearsBuilder.log(String.format("Register source %s to connector %s", temp.getName(), temp.getConnector()));
         if(temp instanceof WriteSource) {
           WriteSource s = (WriteSource)temp;
           new WriteSource(s.getName(), s.getConnector(), s.getXmlDef(), s.isWriteThrough(), s.getTimeout());
