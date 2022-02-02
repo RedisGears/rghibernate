@@ -48,6 +48,7 @@ jobs:
         - run:
             name: Deploy Snapshots to S3
             command: |
+              python3 -m pip install --upgrade pip
               python3 -m pip install awscli
               for f in artifacts/snapshot/*.jar; do
                 aws s3 cp $f s3://redismodules/rghibernate/snapshots/ --acl public-read
@@ -61,8 +62,8 @@ jobs:
         - run:
             name: Deploy Snapshots to S3
             command: |
+              python3 -m pip install --upgrade pip
               python3 -m pip install awscli
-              for f in artifacts/snapshot/*.jar; do
               for f in artifacts/release/*.jar; do
                 aws s3 cp $f s3://redismodules/rghibernate/ --acl public-read
               done
