@@ -19,7 +19,7 @@ import gears.readers.CommandReader;
 
 public class WriteBehind{
   
-  public static final int VERSION = 0x00000100;
+  public static final int VERSION = 0x00000102;
   public static final String DESCRIPTION = "A write behind/read through recipe for RedisGears JVM leverage hibernate for external db conectivity.";
   
   public static class UpdateInfo{
