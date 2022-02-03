@@ -108,14 +108,3 @@ workflows:
           context: common
           <<: *after-build-and-test
           <<: *on-version-tags
-
-  nightly:
-      triggers:
-        - schedule:
-            cron: "0 0 * * *"
-            filters:
-              branches:
-                only:
-                  - master
-      jobs:
-        - build-and-test-ubuntu
