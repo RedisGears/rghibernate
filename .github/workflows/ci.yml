@@ -20,6 +20,10 @@ jobs:
           sudo apt install -y redis-server
           sudo systemctl disable redis-server
           sudo systemctl stop redis-server
+
+      # https://github.com/marketplace/actions/start-mariadb
+      - name: Shutdown Ubuntu MySQL (SUDO)
+        run: sudo service mysql stop
       - name: Set up mysql
         uses: getong/mariadb-action@v1.1
         with:
@@ -27,6 +31,7 @@ jobs:
           mysql password: 'Password123!'
           mysql database: 'test'
           mariadb version: '10.5'
+
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
         with:

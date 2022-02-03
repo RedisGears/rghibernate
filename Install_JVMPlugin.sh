@@ -17,6 +17,6 @@ if [ -f "$WORK_DIR$JVM_PLUGIN_FILE" ]; then
     echo "Skiping jvm plugin download"
 else
     echo "Download jvm plugin"
-    wget -P $WORK_DIR $JVM_PLUGIN_S3_PATH
+    wget -q -P $WORK_DIR $JVM_PLUGIN_S3_PATH
     tar -C $WORK_DIR -xvf $WORK_DIR$JVM_PLUGIN_FILE
 fi
