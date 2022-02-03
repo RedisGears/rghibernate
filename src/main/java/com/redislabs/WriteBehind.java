@@ -18,18 +18,18 @@ import gears.operations.FlatMapOperation;
 import gears.readers.CommandReader;
 
 public class WriteBehind{
-  
-  public static final int VERSION = 0x00000102;
+
+  public static final int VERSION = 0x00000103;
   public static final String DESCRIPTION = "A write behind/read through recipe for RedisGears JVM leverage hibernate for external db conectivity.";
-  
+
   public static class UpdateInfo{
-    
+
 	private int version;
     private Collection<Connector> connectors;
     private Collection<Source> sources;
-    
+
     public UpdateInfo() {}
-    
+
     public UpdateInfo(int version, Collection<Connector> connectors, Collection<Source> sources) {
       this.version = version;
       this.connectors = connectors;
@@ -66,7 +66,7 @@ public class WriteBehind{
       this.sources = sources;
     }
   }
-  
+
   public static String getUpgradeData() throws JsonProcessingException {
     ObjectMapper objectMapper = new ObjectMapper();
     String res = objectMapper.writeValueAsString(new UpdateInfo(VERSION, Connector.getAllConnectors(), Source.getAllSources()));
@@ -74,14 +74,14 @@ public class WriteBehind{
     TypeFactory.defaultInstance().clearCache();
     return res;
   }
-  
+
   public static String getStringVersion(int version) {
     int patch = version & 0x000000FF;
     int minor = ((version & 0x0000FF00) >> 8);
     int major = ((version & 0x00FF0000) >> 16);
     return String.format("%d.%d.%d", major, minor, patch);
   }
-  
+
   public static void main(String[] args) throws Exception {
     String verStr = getStringVersion(VERSION);
     if(args.length == 1 && args[0].equals("version")) {
@@ -89,7 +89,7 @@ public class WriteBehind{
       return;
     }
     GearsBuilder.log(String.format("RGHibernate %s", verStr));
-    
+
     String updateData = GearsBuilder.getUpgradeData();
     UpdateInfo updateInfo = null;
     if (updateData != null) {
@@ -99,11 +99,11 @@ public class WriteBehind{
     	objectMapper.getTypeFactory().clearCache();
     	TypeFactory.defaultInstance().clearCache();
     }
-    
+
     if (updateInfo != null) {
     	GearsBuilder.log(String.format("Upgrade from version %s", getStringVersion(updateInfo.getVersion())));
     }
-    
+
     // add connector registration
     CommandReader newConnectorReader = new CommandReader().setTrigger("SYNC.REGISTERCONNECTOR");
     GearsBuilder.CreateGearsBuilder(newConnectorReader, "Register a new connector").
@@ -119,7 +119,7 @@ public class WriteBehind{
       new Connector(connectorName, connectorXml, batchSize, duration, retryInterval);
       return "OK";
     }).register(ExecutionMode.SYNC);
-    
+
     // add source registration
     CommandReader newSourceReader = new CommandReader().setTrigger("SYNC.REGISTERSOURCE");
     GearsBuilder.CreateGearsBuilder(newSourceReader, "Registe a new source").
@@ -155,7 +155,7 @@ public class WriteBehind{
       } else {
         throw new Exception("Write policy should be either WriteThrough/WriteBehind/ReadThrough");
       }
-      
+
       if(WriteSource.getSource(sourceName) != null) {
         throw new Exception("source already exists");
       }
@@ -172,7 +172,7 @@ public class WriteBehind{
       c.addSource(s);
       return "OK";
     }).register(ExecutionMode.SYNC);
-    
+
     // remove source
     CommandReader newRemoveSourceReader = new CommandReader().setTrigger("SYNC.UNREGISTERSOURCE");
     GearsBuilder.CreateGearsBuilder(newRemoveSourceReader, "Unregiste source").
@@ -185,7 +185,7 @@ public class WriteBehind{
       s.unregister();
       return "OK";
     }).register(ExecutionMode.SYNC);
-    
+
     // remove connector
     CommandReader newRemoveConnectorReader = new CommandReader().setTrigger("SYNC.UNREGISTERCONNECTOR");
     GearsBuilder.CreateGearsBuilder(newRemoveConnectorReader, "Unregiste connector").
@@ -198,56 +198,56 @@ public class WriteBehind{
       c.unregister();
       return "OK";
     }).register(ExecutionMode.SYNC);
-    
+
     // general information
     CommandReader syncInfoReader = new CommandReader().setTrigger("SYNC.INFO");
     GearsBuilder.CreateGearsBuilder(syncInfoReader, "General info about sync").
     flatMap(new FlatMapOperation<Object[], Serializable>() {
 
       /**
-       * 
+       *
        */
       private static final long serialVersionUID = 1L;
 
       @Override
       public Iterable<Serializable> flatmap(Object[] r) throws Exception {
         String subInfoCommand = null;
-        
+
         if(r.length > 1) {
           subInfoCommand = new String((byte[])r[1]);
         }
-        
+
         if("CONNECTORS".equals(subInfoCommand)) {
           return Connector.getAllConnectors().stream().map(Serializable.class::cast).collect(Collectors.toList());
         }
-        
+
         if("SOURCES".equals(subInfoCommand)) {
           return WriteSource.getAllSources().stream().map(Serializable.class::cast).collect(Collectors.toList());
         }
-        
+
         if("GENERAL".equals(subInfoCommand)) {
           LinkedList<Serializable> res = new LinkedList<>();
           res.push("NConnector");
           res.push(Integer.toString(Connector.getAllConnectors().size()));
           res.push("NSources");
           res.push(Integer.toString(WriteSource.getAllSources().size()));
-          
+
           return res;
         }
-        
+
         throw new Exception("no such option");
       }
-      
+
     }).register(ExecutionMode.SYNC);
-    
+
     if(updateInfo != null) {
       GearsBuilder.log("Upgrade registrations");
-      
+
       for(Connector c: updateInfo.getConnectors()) {
         GearsBuilder.log(String.format("Register connector %s", c.getName()));
         new Connector(c.getName(), c.getXmlDef(), c.getBatchSize(), c.getDuration(), c.getRetryInterval());
       }
-      
+
       for(Source temp: updateInfo.getSources()) {
         GearsBuilder.log(String.format("Register source %s to connector %s", temp.getName(), temp.getConnector()));
         if(temp instanceof WriteSource) {
