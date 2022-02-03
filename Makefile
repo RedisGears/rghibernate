@@ -4,7 +4,11 @@ GIT_BRANCH=pullrequest-$(CIRCLE_PR_NUMBER)
 else
 GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 endif
+ifdef CIRCLE_TAG
+GIT_BRANCH=$(CIRCLE_TAG)
+endif
 $(info OS=$(OS))
+$(info GIT_BRANCH=$(GIT_BRANCH))
 
 all: build
 
