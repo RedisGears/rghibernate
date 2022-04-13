@@ -118,4 +118,5 @@ workflows:
                 only:
                   - master
       jobs:
-        - build-and-test-ubuntu
+        - build-and-test-ubuntu:
+            context: common
