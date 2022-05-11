@@ -34,7 +34,7 @@ jobs:
         run: |
           docker run -d -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=yes -v `pwd`/setup-mysql:/docker-entrypoint-initdb.d/setup.sh -p 3306:3306 mariadb:10.4
           sleep 30
-      - run:
+      - run: |
           pip install rltest
           make tests
         env:
