@@ -9,7 +9,7 @@ jobs:
 
   build:
     name: Build and Test
-    runs-on: ubunut-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - name: Set up publishing to maven central
