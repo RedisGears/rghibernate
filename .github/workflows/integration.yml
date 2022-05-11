@@ -26,8 +26,8 @@ jobs:
           key: rghibernate-${{hashFiles('**/pom.xml')}}
       - name: start mariadb
         run: |
-          apt-get install -y mariadb-server-10.5
-          service mariadb start
+          sudo apt-get install -y mariadb-server-10.5
+          sudo service mariadb start
           /bin/bash ./setup-mysql
       - run:
           make tests
