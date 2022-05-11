@@ -1,0 +1,58 @@
+---
+
+name: Integration
+
+on:
+  push:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '**/*.rst'
+    branches:
+      - master
+      - '[0-9].[0-9]'
+    pull_request:
+      branches:
+        - master
+        - '[0-9].[0-9]'
+
+jobs:
+
+  build:
+    name: Build and Test
+    runs-on: ubunut-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up publishing to maven central
+        uses: actions/setup-java@v2
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+      - name: Cache dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.m2/repository
+            /var/cache/apt
+          key: rghibernate-${{hashFiles('**/pom.xml')}}
+      - name: start mariadb
+        run: |
+          apt-get install -y mariadb-server-10.5
+          service mariadb start
+          /bin/bash ./setup-mysql
+      - run:
+          make tests
+        env:
+          JVM_OPTS: -Xmx3200m
+      - name: codecov
+        run: |
+           bash <(curl -s https://codecov.io/bash)
+      - uses: s3-actions/s3cmd@v1.1
+        with:
+          provider: aws
+          region: us-east-1
+          access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: upload snapshots
+        run: |
+          s3cmd put -P artifacts/snapshot/*.jar s3://redismodules/rghibernate/snapshots/
