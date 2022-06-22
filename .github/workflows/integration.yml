@@ -20,6 +20,7 @@ enviroment:
   pythonversion: 3.10
 
 jobs:
+  build:
     name: Build and Test
     runs-on: ubuntu-focal
     steps:
