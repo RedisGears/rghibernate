@@ -32,12 +32,21 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: 3.9
+      - name: shut off exisiting mysql
+        run:
+          sudo service mysql stop
+      - name: set up mariadb
+        uses: getong/mariadb-action@v1.1
+        uses:
+          host_port: 3306
+          mysql database: test
+          mysql user: demouser
+          mysql password: "Password123!"
+          mariadb version: '10.4.10'
       - name: package dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y make mariadb-server-10.3
-          sudo service mariadb start
-          sudo ./setup-mysql
+          sudo apt-get install -y make
       - name: Cache dependencies
         uses: actions/cache@v2
         with:

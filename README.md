@@ -42,6 +42,10 @@ git submodule update --init --recursive
 ```
 Execute `make build`, when finished you will find the compile jar `artifacts/release/rghibernate-<version>-jar-with-dependencies.jar`
 
+### Test
+
+Tests rely on a mysql server configured, to allow connections from the user *demouser* with the password *Password123!*.
+
 ### Example
 First we need to upload the rghibernate jar to RedisGears like this:
 ```
