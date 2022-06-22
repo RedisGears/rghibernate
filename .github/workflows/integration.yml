@@ -1,0 +1,59 @@
+---
+
+name: Integration
+
+on:
+  push:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '**/*.rst'
+    branches:
+      - master
+      - '[0-9].[0-9]'
+  pull_request:
+    branches:
+      - master
+      - '[0-9].[0-9]'
+
+enviroment:
+  pythonversion: 3.10
+
+jobs:
+    name: Build and Test
+    runs-on: ubuntu-focal
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up publishing to maven central
+        uses: actions/setup-java@v2
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+      - name: Cache dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.pip
+            /var/cache/apt
+          key: jedis-${{hashFiles('**/pom.xml', 'pytest/requirements.txt')}}
+    - name: install mariadb
+      run: |
+        apt update -q
+        apt install -y mariadb-server-10.3
+        service mariadb start
+        /bin/bash ./setup-mysql
+    - name: install python
+      uses: actions/setup-python@v2
+      with:
+        python-version: "${{env.pythonversion}}"
+    - name: install test dependencies
+      run: |
+        pip install --upgrade setuptools pip
+        pip install -r pytest/requirements.txt
+    - name: run tests
+      run: |
+         make test
+    - name: codecov
+      run: |
+        bash <(curl -s https://codecov.io/bash)

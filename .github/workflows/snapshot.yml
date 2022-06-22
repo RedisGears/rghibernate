@@ -1,0 +1,56 @@
+---
+
+name: Publish Snapshot
+
+on:
+  workflow_run:
+    workflows: [Integration]
+    types: [completed]
+    branches:
+      - master
+      - '[0-9].[0-9]'
+
+jobs:
+
+  snapshot:
+    name: Deploy Snapshot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up publishing to maven central
+        uses: actions/setup-java@v2
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          server-id: ossrh
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+      - name: Cache dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.m2/repository
+            /var/cache/apt
+          key: jedis-${{hashFiles('**/pom.xml')}}
+      - name: mvn offline
+        run: |
+          mvn -q dependency:go-offline
+      - name: deploy
+        run: |
+          mvn --no-transfer-progress \
+            -DskipTests deploy
+        env:
+          MAVEN_USERNAME: ${{secrets.OSSH_USERNAME}}
+          MAVEN_PASSWORD: ${{secrets.OSSH_TOKEN}}
+    - uses: s3-actions/s3cmd@v1.1
+      with:
+        provider: aws
+        region: us-east-1
+        access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    - name: persist rghibernate to s3
+      run: |
+        for f in `ls target/rghibernate*.jar`; do
+            jarfile=`echo $f|cut -d '/' -f 2-2`
+            s3cmd put -P $i s3://redismodules/rghibernate/snapshots/${jarfile}
+        done
