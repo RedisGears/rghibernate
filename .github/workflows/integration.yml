@@ -35,7 +35,7 @@ jobs:
       - name: package dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y make mariadb-server
+          sudo apt-get install -y make mariadb-server-10.3
           sudo service mariadb start
           sudo ./setup-mysql
       - name: Cache dependencies
