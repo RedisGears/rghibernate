@@ -42,15 +42,15 @@ jobs:
         env:
           MAVEN_USERNAME: ${{secrets.OSSH_USERNAME}}
           MAVEN_PASSWORD: ${{secrets.OSSH_TOKEN}}
-    - uses: s3-actions/s3cmd@v1.1
-      with:
-        provider: aws
-        region: us-east-1
-        access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    - name: persist rghibernate to s3
-      run: |
-        for f in `ls target/rghibernate*.jar`; do
-            jarfile=`echo $f|cut -d '/' -f 2-2`
-            s3cmd put -P $i s3://redismodules/rghibernate/snapshots/${jarfile}
-        done
+      - uses: s3-actions/s3cmd@v1.1
+        with:
+          provider: aws
+          region: us-east-1
+          access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: persist rghibernate to s3
+        run: |
+          for f in `ls target/rghibernate*.jar`; do
+              jarfile=`echo $f|cut -d '/' -f 2-2`
+              s3cmd put -P $i s3://redismodules/rghibernate/snapshots/${jarfile}
+          done
