@@ -37,7 +37,6 @@ jobs:
           sudo service mysql stop
       - name: set up mariadb
         uses: getong/mariadb-action@v1.1
-        uses:
           host_port: 3306
           mysql database: test
           mysql user: demouser
