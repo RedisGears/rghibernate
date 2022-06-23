@@ -3,5 +3,11 @@
 set -e
 
 mysql -u root <<-EOF
+    DROP DATABASE IF EXISTS test;
+    CREATE USER 'demouser'@'localhost' IDENTIFIED VIA mysql_native_password USING PASSWORD('Password123!');
+	CREATE DATABASE test;
 	CREATE TABLE test.persons (person_id VARCHAR(100) NOT NULL, first VARCHAR(100) NOT NULL, last VARCHAR(100) NOT NULL, age INT NOT NULL, PRIMARY KEY (person_id));
+	FLUSH PRIVILEGES;
+	GRANT ALL PRIVILEGES ON test.* to demouser@localhost;
+	FLUSH PRIVILEGES;
 	EOF
