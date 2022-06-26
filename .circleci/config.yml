@@ -43,15 +43,16 @@ jobs:
       - image: 'redislabs/redisgears:edge'
     steps:
       - build-and-test
-      - run:
-          name: deploy maven artifact
-          command: mvn -s .circleci.settings.xml -DskipTests deploy
 
   build_and_test_and_deploy:
     docker:
       - image: 'redislabs/redisgears:edge'
     steps:
       - build-and-test
+      - run:
+          name: deploy maven artifact
+          command: mvn -s .circleci.settings.xml -DskipTests deploy
+
 
   deploy_snapshots:
       docker:
