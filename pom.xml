@@ -11,6 +11,13 @@
 	<name>RGHibernate</name>
 	<description>A Write-Behind and Write-Through recipe for RedisGears using Hibernate</description>
 	<url>https://oss.redislabs.com/redisgears</url>
+	<licenses>
+		<license>
+			<name>BSD 3-clause</name>
+			<url>http://github.com/redisgears/rghibernate/raw/master/LICENSE.txt</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
 
 	<organization>
 		<name>RedisLabs</name>
