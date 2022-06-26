@@ -1,9 +1,8 @@
 version: 2.1
 
-jobs:
-  build-and-test-ubuntu:
-    docker:
-      - image: 'redislabs/redisgears:edge'
+commands:
+
+  build-and-test:
     steps:
       - run:
           name: Setup executor
@@ -31,14 +30,30 @@ jobs:
       - run:
           name: Test
           command: make tests
-      - run:
-          name: deploy maven artifact
-          command: mvn -s .circleci.settings.xml -DskipTests deploy
       - persist_to_workspace:
           root: artifacts
           paths:
             - 'snapshot/*.jar'
             - 'release/*.jar'
+
+jobs:
+
+  build_and_test:
+    docker:
+      - image: 'redislabs/redisgears:edge'
+    steps:
+      - build-and-test
+
+  build_and_test_and_deploy:
+    docker:
+      - image: 'redislabs/redisgears:edge'
+    steps:
+      - build-and-test
+      - run:
+          name: deploy maven artifact
+          command: mvn -s .circleci.settings.xml -DskipTests deploy
+
+
   deploy_snapshots:
       docker:
         - image: redisfab/rmbuilder:6.0.9-x64-buster
@@ -68,19 +83,31 @@ jobs:
                 aws s3 cp $f s3://redismodules/rghibernate/ --acl public-read
               done
 
-on-any-branch: &on-any-branch
+not-on-integ-branch: &not-on-integ-branch
   filters:
     branches:
-      only: /.*/
+      ignore:
+        - master
+        - /^\d+\.\d+.*$/
+        - /^feature-.*$/
     tags:
-      only: /.*/
+      ignore: /.*/
 
 on-master: &on-master
   filters:
     branches:
       only:
         - master
-        - write_through_support
+
+on-integ-branch: &on-integ-branch
+  filters:
+    branches:
+      only:
+        - master
+        - /^\d+\.\d+.*$/
+        - /^feature-.*$/
+    tags:
+      ignore: /.*/
 
 on-version-tags: &on-version-tags
   filters:
@@ -89,24 +116,26 @@ on-version-tags: &on-version-tags
     tags:
       only: /^v[0-9].*/
 
-after-build-and-test: &after-build-and-test
+after-build-and-test-and-deploy: &after-build-and-test-and-deploy
   requires:
-    - build-and-test-ubuntu
+    - build_and_test_and_deploy
 
 workflows:
   version: 2
   commit:
     jobs:
-      - build-and-test-ubuntu:
-          <<: *on-any-branch
+      - build_and_test:
+          <<: *not-on-integ-branch
+      - build_and_test_and_deploy:
           context: common
+          <<: *on-integ-branch
       - deploy_snapshots:
           context: common
-          <<: *after-build-and-test
-          <<: *on-master
+          <<: *after-build-and-test-and-deploy
+          <<: *on-integ-branch
       - deploy_release:
           context: common
-          <<: *after-build-and-test
+          <<: *after-build-and-test-and-deploy
           <<: *on-version-tags
 
   nightly:
@@ -118,5 +147,5 @@ workflows:
                 only:
                   - master
       jobs:
-        - build-and-test-ubuntu:
+        - build_and_test_and_deploy:
             context: common
