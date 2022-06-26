@@ -124,11 +124,12 @@ workflows:
   version: 2
   commit:
     jobs:
-      - build_and_test:
-          <<: *not-on-integ-branch
+      # - build_and_test:
+      #     <<: *not-on-integ-branch
       - build_and_test_and_deploy:
           context: common
-          <<: *on-integ-branch
+          <<: *not-on-integ-branch
+          # <<: *on-integ-branch
       - deploy_snapshots:
           context: common
           <<: *after-build-and-test-and-deploy
