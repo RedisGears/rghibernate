@@ -71,7 +71,7 @@
 		<dependency>
 			<groupId>com.redislabs</groupId>
 			<artifactId>gear_runtime</artifactId>
-			<version>0.0.3-SNAPSHOT</version>
+			<version>1.2.3</version>
 		</dependency>
 		<dependency>
 			<groupId>org.mariadb.jdbc</groupId>
