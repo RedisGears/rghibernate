@@ -42,5 +42,5 @@ jobs:
             -Dgpg.passphrase='${{ secrets.OSSRH_GPG_SECRET_KEY_PASSWORD }}' \
             -DskipTests deploy -P release
         env:
-          MAVEN_USERNAME: ${{secrets.OSSRH_USERNAME}}
-          MAVEN_PASSWORD: ${{secrets.OSSRH_TOKEN}}
+          MAVEN_USERNAME: ${{secrets.OSSH_USERNAME}}
+          MAVEN_PASSWORD: ${{secrets.OSSH_TOKEN}}
