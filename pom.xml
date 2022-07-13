@@ -11,6 +11,13 @@
 	<name>RGHibernate</name>
 	<description>A Write-Behind and Write-Through recipe for RedisGears using Hibernate</description>
 	<url>https://oss.redislabs.com/redisgears</url>
+	<licenses>
+		<license>
+			<name>BSD 3-clause</name>
+			<url>http://github.com/redisgears/rghibernate/raw/master/LICENSE.txt</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
 
 	<organization>
 		<name>RedisLabs</name>
@@ -76,7 +83,7 @@
 		<dependency>
 			<groupId>com.redislabs</groupId>
 			<artifactId>gear_runtime</artifactId>
-			<version>0.0.3-SNAPSHOT</version>
+			<version>1.2.3</version>
 		</dependency>
 		<dependency>
 			<groupId>org.mariadb.jdbc</groupId>
