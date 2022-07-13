@@ -1,4 +1,3 @@
-OS?=$(shell ./deps/readies/bin/platform --osnick)
 ifdef CIRCLE_PR_NUMBER
 GIT_BRANCH=pullrequest-$(CIRCLE_PR_NUMBER)
 else
@@ -7,7 +6,6 @@ endif
 ifdef CIRCLE_TAG
 GIT_BRANCH=$(CIRCLE_TAG)
 endif
-$(info OS=$(OS))
 $(info GIT_BRANCH=$(GIT_BRANCH))
 
 all: build
