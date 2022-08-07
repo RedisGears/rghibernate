@@ -82,9 +82,9 @@ public class ReadSource extends Source implements ForeachOperation<KeysReaderRec
           GearsBuilder.overrideReply(error);
           throw new Exception(error);
         }
+        Object value = e.getValue();
         if (value != null) {
           command.add(propKey);
-          Object value = e.getValue();
           command.add(pd.convertToStr(value));
         }
       }
@@ -133,9 +133,9 @@ public class ReadSource extends Source implements ForeachOperation<KeysReaderRec
             GearsBuilder.overrideReply(error);
             throw new Exception(error);
           }
+          Object value = e.getValue();
           if (value != null){
             response.add(propKey);
-            Object value = e.getValue();
             response.add(pd.convertToStr(value));
           }
         }
