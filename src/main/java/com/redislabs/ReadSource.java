@@ -82,9 +82,11 @@ public class ReadSource extends Source implements ForeachOperation<KeysReaderRec
           GearsBuilder.overrideReply(error);
           throw new Exception(error);
         }
-        command.add(propKey);
         Object value = e.getValue();
-        command.add(pd.convertToStr(value));
+        if (value != null) {
+          command.add(propKey);
+          command.add(pd.convertToStr(value));
+        }
       }
       
       
@@ -131,16 +133,22 @@ public class ReadSource extends Source implements ForeachOperation<KeysReaderRec
             GearsBuilder.overrideReply(error);
             throw new Exception(error);
           }
-          response.add(propKey);
           Object value = e.getValue();
-          response.add(pd.convertToStr(value));
+          if (value != null){
+            response.add(propKey);
+            response.add(pd.convertToStr(value));
+          }
         }
       }else {
         for(String f : fields) {
           if(res.containsKey(f)) {
             PropertyData pd = getPropertyMapping(f);
             Object value = res.get(f);
-            response.add(pd != null ? pd.convertToStr(value) : value.toString());
+            if( value == null) {
+              response.add(null);
+            } else {
+              response.add(pd != null ? pd.convertToStr(value) : value.toString());
+            }
           }else {
             response.add(null);
           }
