@@ -1,11 +1,11 @@
 package com.redislabs;
 
-import java.io.Serializable;
-import java.sql.Date;
-
 import org.hibernate.type.AbstractStandardBasicType;
 import org.hibernate.type.TimestampType;
 import org.hibernate.type.Type;
+
+import java.io.Serializable;
+import java.sql.Timestamp;
 
 public class PropertyData implements Serializable{
 
@@ -43,7 +43,7 @@ public class PropertyData implements Serializable{
       // try first to parse as timestamp
       try {
         long timestamp = Long.parseLong(val);
-        return new Date(timestamp);
+        return new Timestamp(timestamp);
       }catch(Exception e) {
         
       }
@@ -52,7 +52,7 @@ public class PropertyData implements Serializable{
   }
   
   public String convertToStr(Object val) {
-    if(this.type instanceof TimestampType && val instanceof java.sql.Timestamp) {
+    if(this.type instanceof TimestampType && (val instanceof java.sql.Timestamp)) {
       // try first to parse as timestamp
       try {
         return Long.toString(((java.sql.Timestamp)val).getTime());

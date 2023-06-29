@@ -1,21 +1,18 @@
 package com.redislabs;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.stream.Collectors;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
-
 import gears.ExecutionMode;
 import gears.GearsBuilder;
 import gears.operations.FlatMapOperation;
 import gears.readers.CommandReader;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedList;
+import java.util.stream.Collectors;
 
 public class WriteBehind{
 
@@ -85,7 +82,7 @@ public class WriteBehind{
   public static void main(String[] args) throws Exception {
     String verStr = getStringVersion(VERSION);
     if(args.length == 1 && args[0].equals("version")) {
-      System.out.print(String.format("%s\r\n", verStr));
+      System.out.printf("%s\r\n", verStr);
       return;
     }
     GearsBuilder.log(String.format("RGHibernate %s", verStr));

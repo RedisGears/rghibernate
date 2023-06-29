@@ -41,7 +41,8 @@ public class WriteSource extends Source{
    
     KeysReader reader = new KeysReader().
         setPattern(getHashPrefix() + ":*").
-        setEventTypes(new String[] {"hset", "hmset", "hincrbyfloat", "hincrby", "hdel", "del", "change"});
+        //setEventTypes(new String[] {"hset", "hmset", "hincrbyfloat", "hincrby", "hdel", "del", "change"});
+        setEventTypes(new String[] {"hset", "hmset", "hincrbyfloat", "hincrby", "hdel", "del"});
 
     if(writeThrough) {
       /*
@@ -56,7 +57,7 @@ public class WriteSource extends Source{
         try {
           return this.asyncforeach(r);
         } catch (Exception e) {
-          GearsBuilder.log(String.format("Error: ", e.toString()));
+          GearsBuilder.log(String.format("Error: ", e));
           return null;
         }
       }).
@@ -103,11 +104,11 @@ public class WriteSource extends Source{
       
       streamId = foreachInternal(record);
       
-      WriteThroughMD wtMD = new WriteThroughMD(streamId, f, timeout * 1000);
+      WriteThroughMD wtMD = new WriteThroughMD(streamId, f, timeout * 1000L);
       Connector c = Connector.getConnector(this.getConnector());
       c.queue.add(wtMD);
     }catch(Exception e) {
-      GearsBuilder.overrideReply(String.format("-Err %s", e.toString()));
+      GearsBuilder.overrideReply(String.format("-Err %s", e));
       f.setError(e.toString());
     }finally {
       GearsBuilder.releaseRedisGil();
@@ -119,7 +120,7 @@ public class WriteSource extends Source{
     try {
       foreachInternal(record);
     } catch(Exception e) {
-      GearsBuilder.log(String.format("-Err %s", e.toString()));
+      GearsBuilder.log(String.format("-Err %s", e));
       throw e;
     }
   }
@@ -133,7 +134,7 @@ public class WriteSource extends Source{
     try {
       getIdProperty().convertToObject(id);
     }catch (Exception e) {
-      String msg = String.format("Failed parsing id field \"%s\", value \"%s\", error=\"%s\"", getIdProperty().getName(), id, e.toString());
+      String msg = String.format("Failed parsing id field \"%s\", value \"%s\", error=\"%s\"", getIdProperty().getName(), id, e);
       GearsBuilder.log(msg, LogLevel.WARNING);
       throw new Exception(msg);
     }
@@ -161,7 +162,7 @@ public class WriteSource extends Source{
             throw new Exception(String.format("mandatory \"%s\" value is not set", pd.getName()));
           }
         }catch(Exception e) {
-          String msg = String.format("Failed parsing acheme for field \"%s\", value \"%s\", error=\"%s\"", pd.getName(), val, e.toString());
+          String msg = String.format("Failed parsing acheme for field \"%s\", value \"%s\", error=\"%s\"", pd.getName(), val, e);
           GearsBuilder.log(msg, LogLevel.WARNING);
           throw new Exception(msg);
         }

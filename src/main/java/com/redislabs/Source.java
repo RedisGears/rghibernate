@@ -61,11 +61,16 @@ public abstract class Source implements OnRegisteredOperation, OnUnregisteredOpe
     this.name = name;
     this.xmlDef = xmlDef;
     this.propertyMappings = new HashMap<>();
-    
+
     StandardServiceRegistry tempRegistry = new StandardServiceRegistryBuilder()
-        .configure( InMemoryURLFactory.getInstance().build("configuration", RGHibernate.get(connector).getXmlConf()))
+         .configure( InMemoryURLFactory.getInstance().build("configuration", RGHibernate.get(connector).getXmlConf()))
         .build();
-    
+
+    //String dbpass = "1234";
+    //StandardServiceRegistry tempRegistry = new StandardServiceRegistryBuilder()
+    //        .configure( InMemoryURLFactory.getInstance().build("configuration", RGHibernate.get(connector).getXmlConf().replaceAll("(connection\\.password\">)[^<]*", "$1" + dbpass)))
+     //       .build();
+
     MetadataSources tempSources = new MetadataSources(tempRegistry);
     tempSources.addURL(InMemoryURLFactory.getInstance().build("mapping", xmlDef));
     Metadata metadata = tempSources.getMetadataBuilder().build();

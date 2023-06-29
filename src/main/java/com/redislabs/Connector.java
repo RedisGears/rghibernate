@@ -1,6 +1,8 @@
 package com.redislabs;
 
+import java.io.PrintWriter;
 import java.io.Serializable;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -12,6 +14,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.hibernate.Session;
 import org.hibernate.Transaction;
@@ -41,7 +44,10 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
   public static final String ENTETY_NAME_STR = "__entityName__";
   public static final String EVENT_STR = "__event__";
   public static final String SOURCE_STR = "__source__";
-  
+
+  public static final String RETRY_STR = "_RETRY";
+  public static final String DLQ_STR = "_DLQ";
+
   class RGHibernateStandardServiceInitiator implements StandardServiceInitiator<Service>{
 
     private Map values;
@@ -105,7 +111,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
   private int retryInterval;
   
   public transient ConcurrentLinkedDeque<WriteThroughMD> queue = null;
-  
+
   public Connector() {}
   
   public Connector(String name, String xmlDef, int batchSize, int duration, int retryInterval) {
@@ -115,7 +121,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     System.setProperty("javax.xml.bind.JAXBContextFactory", "org.eclipse.persistence.jaxb.JAXBContextFactory");
     Thread.currentThread().setContextClassLoader(WriteBehind.class.getClassLoader());
     StandardServiceRegistryImpl tempRegistry = (StandardServiceRegistryImpl)new StandardServiceRegistryBuilder()
-        .configure( InMemoryURLFactory.getInstance().build("configuration", this.xmlDef))
+        .configure( InMemoryURLFactory.getInstance().build("configuration", xmlDef))
         .build();
     
     RGHibernateStandardServiceInitiator initiator = this.new RGHibernateStandardServiceInitiator();
@@ -137,7 +143,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
         .setPattern(streamName)
         .setBatchSize(batchSize)
         .setDuration(duration)
-        .setFailurePolicy(FailurePolicy.RETRY)
+        .setFailurePolicy(FailurePolicy.CONTINUE)
         .setFailureRertyInterval(retryInterval);
 
     GearsBuilder<HashMap<String,Object>> builder = GearsBuilder.CreateGearsBuilder(streamReader, String.format("%s connector", name));
@@ -146,9 +152,24 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     .map(this)
     .accumulate(this)
     .foreach(this)
-    .map(ArrayList<HashMap<String, Object>>::size)
+    .map(ArrayList::size)
     .register(ExecutionMode.ASYNC_LOCAL, this, this);
-    
+
+    String retryStreamName = String.format("%s_Stream-%s-%s-*", RETRY_STR, name, uuid);
+    StreamReader retryStreamReader = new StreamReader()
+            .setPattern(retryStreamName)
+            .setBatchSize(1)
+            .setFailurePolicy(FailurePolicy.CONTINUE);
+
+    GearsBuilder<HashMap<String,Object>> retryBuilder = GearsBuilder.CreateGearsBuilder(retryStreamReader, String.format("Retry %s connector", name));
+
+    retryBuilder
+            .map(this)
+            .accumulate(this)
+            .foreach(this)
+            .map(ArrayList::size)
+            .register(ExecutionMode.ASYNC_LOCAL, this, this);
+
     connector = RGHibernate.getOrCreate(name);
     connector.setXmlConf(xmlDef);
     connectors.put(this.name, this);
@@ -202,7 +223,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     
     String sourceName = map.get(SOURCE_STR);
     
-    Source source = (WriteSource)Source.getSource(sourceName);
+    Source source = Source.getSource(sourceName);
     
     Map<String, Object> newMap = new HashMap<>();
     PropertyData idProperty =  source.getIdProperty();
@@ -212,7 +233,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     try {
       convertedVal = idProperty.convertToObject(val);
     }catch (Exception e) {
-      String msg = String.format("Can not conver id property %s val %s, error='%s'", idProperty.getName(), val, e.toString());
+      String msg = String.format("Can not convert id property %s val %s, error='%s'", idProperty.getName(), val, e);
       GearsBuilder.log(msg, LogLevel.WARNING);
       throw new Exception(msg);
     }
@@ -231,7 +252,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
         pm = source.getPropertyMapping(key);
         convertedVal = pm.convertToObject(val);
       }catch (Exception e) {
-        String msg = String.format("Can not find property mapping for %s val %s, error='%s'", key, val, e.toString());
+        String msg = String.format("Can not find property mapping for %s val %s, error='%s'", key, val, e);
         GearsBuilder.log(msg, LogLevel.WARNING);
         throw new Exception(msg);
       }
@@ -244,6 +265,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     
     return r;
   }
+
 
   @Override
   public void foreach(ArrayList<HashMap<String, Object>> record) throws Exception {
@@ -258,7 +280,9 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
         
         for(Map<String, Object> r: record) {
           lastStreamId = new String((byte[])r.get("id"));
-          Map<String, Object> map = (Map<String, Object>) r.get("value");
+          Map<String, Object> value = (Map<String, Object>) r.get("value");
+          Map<String, Object> map = value.entrySet().stream()
+                  .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue()));
           String sourceName = (String)map.remove(SOURCE_STR);
           
           String event = (String)map.remove(EVENT_STR);
@@ -289,11 +313,23 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
         transaction.commit();
         session.clear();
       }catch (Exception e) {
-        msg = String.format("Failed commiting transaction error='%s'", e.toString());
+        msg = String.format("Failed commiting transaction error='%s'", e);
         GearsBuilder.log(msg, LogLevel.WARNING);
-        connector.closeSession();
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        e.printStackTrace(pw);
+        GearsBuilder.log(sw.toString(), LogLevel.WARNING);
+
+        //connector.closeSession();
+        if ( connector.getSession().getTransaction().isActive() ) {
+          connector.getSession().getTransaction().rollback();
+        }
+
+        connector.getSession().clear();
         lastStreamId = null;
         cause = e;
+
+        retry(record, e);
       }
       
       while(!queue.isEmpty()) {
@@ -310,9 +346,78 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
         throw new Exception(msg, cause);
       }
     }
-    
   }
-  
+
+  private void retry(ArrayList<HashMap<String, Object>> record, Exception e) throws Exception {
+    for(Map<String, Object> r: record) {
+      String streamName = new String((byte[])r.get("key"));
+
+      Map<String, Object> value = (Map<String, Object>) r.get("value");
+      Map<String, Object> map = value.entrySet().stream()
+              .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue()));
+
+      String sourceName = (String)map.remove(SOURCE_STR);
+      Source source = Source.getSource(sourceName);
+
+      Map<String, String> newMap = new HashMap<>();
+
+      if ( streamName.startsWith(RETRY_STR) ) {
+        streamName = streamName.replaceFirst("^" + RETRY_STR, DLQ_STR);
+        newMap.put("error", e.getMessage());
+        Throwable ex = e;
+        while (ex.getCause() != null)
+          ex = ex.getCause();
+        newMap.put("cause", ex.getLocalizedMessage());
+      }
+      else {
+        streamName = RETRY_STR + streamName;
+      }
+
+      String[] command;
+      Stream<String> commandStreamInit = Stream.of("XADD", streamName, "*");
+
+      String msg = null;
+      PropertyData idProperty =  source.getIdProperty();
+      Object idVal = map.remove(idProperty.getName());
+      String idStr = null;
+      try {
+        idStr = idProperty.convertToStr(idVal);
+      }catch (Exception ex) {
+        msg = String.format("Can not conver id property %s val %s, error='%s'", idProperty.getName(), idVal, ex);
+        GearsBuilder.log(msg, LogLevel.WARNING);
+        throw new Exception(msg);
+      }
+
+      newMap.put(idProperty.getName(), idStr);
+      newMap.put(ENTETY_NAME_STR, map.remove(ENTETY_NAME_STR).toString());
+      newMap.put(EVENT_STR, map.remove(EVENT_STR).toString());
+      newMap.put(SOURCE_STR, sourceName);
+      for(String key : map.keySet()) {
+        Object val = map.get(key);
+
+        PropertyData pm = null;
+        String convertedVal = null;
+        try {
+          pm = source.getPropertyMapping(key);
+          convertedVal = pm.convertToStr(val);
+        } catch (Exception ex) {
+          msg = String.format("Can not find property mapping for %s val %s, error='%s'", key, val, ex);
+          GearsBuilder.log(msg, LogLevel.WARNING);
+          throw new Exception(msg);
+        }
+
+
+        newMap.put(key, convertedVal);
+      }
+
+      Stream<String> fieldsStream = newMap.entrySet().stream()
+              .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue()));
+
+      command = Stream.concat(commandStreamInit, fieldsStream).toArray(String[]::new);
+      GearsBuilder.execute(command);
+    }
+  }
+
   public Object getObject(String entetyName, Serializable pk) throws Exception {
     Object o = null;
     synchronized (this.connector) {
@@ -321,7 +426,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
         session.clear();
         o = session.get(entetyName, pk);
       }catch(Exception e) {
-        String msg = String.format("Failed fetching data from databse, error='%s'", e.toString());
+        String msg = String.format("Failed fetching data from databse, error='%s'", e);
         GearsBuilder.log(msg, LogLevel.WARNING);
         connector.closeSession();
         throw e;

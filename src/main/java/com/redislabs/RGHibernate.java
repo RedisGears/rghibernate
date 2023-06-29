@@ -1,5 +1,13 @@
 package com.redislabs;
 
+import gears.GearsBuilder;
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.boot.Metadata;
+import org.hibernate.boot.MetadataSources;
+import org.hibernate.boot.registry.StandardServiceRegistry;
+import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.Serializable;
@@ -12,15 +20,6 @@ import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
-
-import org.hibernate.Session;
-import org.hibernate.SessionFactory;
-import org.hibernate.boot.Metadata;
-import org.hibernate.boot.MetadataSources;
-import org.hibernate.boot.registry.StandardServiceRegistry;
-import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
-
-import gears.GearsBuilder;
 
 
 public class RGHibernate implements Closeable, Serializable {
@@ -42,9 +41,9 @@ public class RGHibernate implements Closeable, Serializable {
     return hibernateConnections.get(name);
   }
   
-  private String name;
+  private final String name;
   private String xmlConf;
-  private Map<String, String> sources;
+  private final Map<String, String> sources;
   private transient Session session = null;
   private transient SessionFactory factory = null;
   private transient StandardServiceRegistry registry = null;
@@ -101,6 +100,9 @@ public class RGHibernate implements Closeable, Serializable {
   private void generateSession() {
     registry = new StandardServiceRegistryBuilder()
         .configure(InMemoryURLFactory.getInstance().build("configuration", xmlConf)).build();
+    //String dbpass = "1234";
+    //registry = new StandardServiceRegistryBuilder()
+     //       .configure(InMemoryURLFactory.getInstance().build("configuration", xmlConf.replaceAll("(connection\\.password\">)[^<]*", "$1" + dbpass))).build();
     MetadataSources sources = new MetadataSources(registry);
     Collection<String> srcs = this.sources.values();
     for (String src : srcs) {
@@ -191,7 +193,7 @@ public class RGHibernate implements Closeable, Serializable {
 
       }
     } catch (SQLException e) {
-      GearsBuilder.log(String.format("Exception on deregister drivers, %s", e.toString()));
+      GearsBuilder.log(String.format("Exception on deregister drivers, %s", e));
     }
 
     // Closing timer thread for oracle driver not to leak..
