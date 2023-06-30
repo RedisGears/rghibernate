@@ -1,21 +1,11 @@
 package com.redislabs;
 
-import java.io.PrintWriter;
-import java.io.Serializable;
-import java.io.StringWriter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
+import gears.ExecutionMode;
+import gears.GearsBuilder;
+import gears.LogLevel;
+import gears.operations.*;
+import gears.readers.StreamReader;
+import gears.readers.StreamReader.FailurePolicy;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 import org.hibernate.boot.registry.StandardServiceInitiator;
@@ -24,16 +14,12 @@ import org.hibernate.boot.registry.internal.StandardServiceRegistryImpl;
 import org.hibernate.service.Service;
 import org.hibernate.service.spi.ServiceRegistryImplementor;
 
-import gears.ExecutionMode;
-import gears.GearsBuilder;
-import gears.LogLevel;
-import gears.operations.AccumulateOperation;
-import gears.operations.ForeachOperation;
-import gears.operations.MapOperation;
-import gears.operations.OnRegisteredOperation;
-import gears.operations.OnUnregisteredOperation;
-import gears.readers.StreamReader;
-import gears.readers.StreamReader.FailurePolicy;
+import java.io.Serializable;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class Connector implements ForeachOperation<ArrayList<HashMap<String,Object>>>,
 AccumulateOperation<HashMap<String,Object>, ArrayList<HashMap<String, Object>>>,
@@ -44,8 +30,6 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
   public static final String ENTETY_NAME_STR = "__entityName__";
   public static final String EVENT_STR = "__event__";
   public static final String SOURCE_STR = "__source__";
-
-  public static final String RETRY_STR = "_RETRY";
   public static final String DLQ_STR = "_DLQ";
 
   class RGHibernateStandardServiceInitiator implements StandardServiceInitiator<Service>{
@@ -155,21 +139,6 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     .map(ArrayList::size)
     .register(ExecutionMode.ASYNC_LOCAL, this, this);
 
-    String retryStreamName = String.format("%s_Stream-%s-%s-*", RETRY_STR, name, uuid);
-    StreamReader retryStreamReader = new StreamReader()
-            .setPattern(retryStreamName)
-            .setBatchSize(1)
-            .setFailurePolicy(FailurePolicy.CONTINUE);
-
-    GearsBuilder<HashMap<String,Object>> retryBuilder = GearsBuilder.CreateGearsBuilder(retryStreamReader, String.format("Retry %s connector", name));
-
-    retryBuilder
-            .map(this)
-            .accumulate(this)
-            .foreach(this)
-            .map(ArrayList::size)
-            .register(ExecutionMode.ASYNC_LOCAL, this, this);
-
     connector = RGHibernate.getOrCreate(name);
     connector.setXmlConf(xmlDef);
     connectors.put(this.name, this);
@@ -272,13 +241,16 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     String lastStreamId = null;
     String msg = null;
     Exception cause = null;
+    int lastCommittedIdx = -1;
     synchronized (this.connector) {
       try {
         Session session = connector.getSession();
         Transaction transaction = session.beginTransaction();
         boolean isMerge = true;
-        
+
+        int idx = -1;
         for(Map<String, Object> r: record) {
+          idx++;
           lastStreamId = new String((byte[])r.get("id"));
           Map<String, Object> value = (Map<String, Object>) r.get("value");
           Map<String, Object> map = value.entrySet().stream()
@@ -292,6 +264,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
               session.clear();
               transaction = session.beginTransaction();
               isMerge = true;
+              lastCommittedIdx = idx - 1;
             }
             session.merge((String)map.remove(ENTETY_NAME_STR), map);
           }else {
@@ -300,6 +273,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
               session.clear();
               transaction = session.beginTransaction();
               isMerge = false;
+              lastCommittedIdx = idx - 1;
             }
             Source source = Source.getSource(sourceName);
             Object o = session.get((String)map.remove(ENTETY_NAME_STR), (Serializable)map.get(source.getIdProperty().getName()));
@@ -315,10 +289,6 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
       }catch (Exception e) {
         msg = String.format("Failed commiting transaction error='%s'", e);
         GearsBuilder.log(msg, LogLevel.WARNING);
-        StringWriter sw = new StringWriter();
-        PrintWriter pw = new PrintWriter(sw);
-        e.printStackTrace(pw);
-        GearsBuilder.log(sw.toString(), LogLevel.WARNING);
 
         //connector.closeSession();
         if ( connector.getSession().getTransaction().isActive() ) {
@@ -329,7 +299,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
         lastStreamId = null;
         cause = e;
 
-        retry(record, e);
+        retry(record.subList(lastCommittedIdx + 1, record.size()));
       }
       
       while(!queue.isEmpty()) {
@@ -348,74 +318,102 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
     }
   }
 
-  private void retry(ArrayList<HashMap<String, Object>> record, Exception e) throws Exception {
+  private void retry(List<HashMap<String, Object>> record) throws Exception {
     for(Map<String, Object> r: record) {
-      String streamName = new String((byte[])r.get("key"));
-
-      Map<String, Object> value = (Map<String, Object>) r.get("value");
-      Map<String, Object> map = value.entrySet().stream()
-              .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue()));
-
-      String sourceName = (String)map.remove(SOURCE_STR);
-      Source source = Source.getSource(sourceName);
-
-      Map<String, String> newMap = new HashMap<>();
-
-      if ( streamName.startsWith(RETRY_STR) ) {
-        streamName = streamName.replaceFirst("^" + RETRY_STR, DLQ_STR);
-        newMap.put("error", e.getMessage());
-        Throwable ex = e;
-        while (ex.getCause() != null)
-          ex = ex.getCause();
-        newMap.put("cause", ex.getLocalizedMessage());
-      }
-      else {
-        streamName = RETRY_STR + streamName;
-      }
-
-      String[] command;
-      Stream<String> commandStreamInit = Stream.of("XADD", streamName, "*");
-
-      String msg = null;
-      PropertyData idProperty =  source.getIdProperty();
-      Object idVal = map.remove(idProperty.getName());
-      String idStr = null;
       try {
-        idStr = idProperty.convertToStr(idVal);
-      }catch (Exception ex) {
-        msg = String.format("Can not conver id property %s val %s, error='%s'", idProperty.getName(), idVal, ex);
+        Session session = connector.getSession();
+        Transaction transaction = session.beginTransaction();
+
+        Map<String, Object> value = (Map<String, Object>) r.get("value");
+        Map<String, Object> map = value.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue()));
+        String sourceName = (String) map.remove(SOURCE_STR);
+
+        String event = (String) map.remove(EVENT_STR);
+        if (event.charAt(0) != 'd') {
+          session.merge((String) map.remove(ENTETY_NAME_STR), map);
+        } else {
+          Source source = Source.getSource(sourceName);
+          Object o = session.get((String) map.remove(ENTETY_NAME_STR), (Serializable) map.get(source.getIdProperty().getName()));
+          // o can be null on hdel that removed the last field
+          if (o != null) {
+            session.delete(o);
+          }
+        }
+        transaction.commit();
+        session.clear();
+      } catch (Exception e) {
+        String msg = String.format("Failed retrying transaction error='%s'", e);
+        GearsBuilder.log(msg, LogLevel.WARNING);
+
+        //connector.closeSession();
+        if (connector.getSession().getTransaction().isActive()) {
+          connector.getSession().getTransaction().rollback();
+        }
+
+        connector.getSession().clear();
+        putInDLQ(r, e);
+      }
+    }
+  }
+
+  private void putInDLQ(Map<String, Object> r, Exception e) throws Exception {
+    String streamName = new String((byte[])r.get("key"));
+    Map<String, Object> map = (Map<String, Object>) r.get("value");
+
+    Map<String, String> newMap = new HashMap<>();
+
+    newMap.put("error", e.getMessage());
+    Throwable ex = e;
+    while (ex.getCause() != null)
+      ex = ex.getCause();
+    newMap.put("cause", ex.getLocalizedMessage());
+
+    String[] command;
+    Stream<String> commandStreamInit = Stream.of("XADD", DLQ_STR + streamName, "*");
+
+    String msg = null;
+    String sourceName = (String)map.remove(SOURCE_STR);
+    Source source = Source.getSource(sourceName);
+    PropertyData idProperty =  source.getIdProperty();
+    Object idVal = map.remove(idProperty.getName());
+    String idStr = null;
+    try {
+      idStr = idProperty.convertToStr(idVal);
+    }catch (Exception propEx) {
+      msg = String.format("Can not convert id property %s val %s, error='%s'", idProperty.getName(), idVal, propEx);
+      GearsBuilder.log(msg, LogLevel.WARNING);
+      throw new Exception(msg);
+    }
+
+    newMap.put(idProperty.getName(), idStr);
+    newMap.put(ENTETY_NAME_STR, map.remove(ENTETY_NAME_STR).toString());
+    newMap.put(EVENT_STR, map.remove(EVENT_STR).toString());
+    newMap.put(SOURCE_STR, sourceName);
+
+    for(String key : map.keySet()) {
+      Object val = map.get(key);
+
+      PropertyData pm = null;
+      String convertedVal = null;
+      try {
+        pm = source.getPropertyMapping(key);
+        convertedVal = pm.convertToStr(val);
+      } catch (Exception propEx) {
+        msg = String.format("Can not find property mapping for %s val %s, error='%s'", key, val, propEx);
         GearsBuilder.log(msg, LogLevel.WARNING);
         throw new Exception(msg);
       }
 
-      newMap.put(idProperty.getName(), idStr);
-      newMap.put(ENTETY_NAME_STR, map.remove(ENTETY_NAME_STR).toString());
-      newMap.put(EVENT_STR, map.remove(EVENT_STR).toString());
-      newMap.put(SOURCE_STR, sourceName);
-      for(String key : map.keySet()) {
-        Object val = map.get(key);
 
-        PropertyData pm = null;
-        String convertedVal = null;
-        try {
-          pm = source.getPropertyMapping(key);
-          convertedVal = pm.convertToStr(val);
-        } catch (Exception ex) {
-          msg = String.format("Can not find property mapping for %s val %s, error='%s'", key, val, ex);
-          GearsBuilder.log(msg, LogLevel.WARNING);
-          throw new Exception(msg);
-        }
-
-
-        newMap.put(key, convertedVal);
-      }
-
-      Stream<String> fieldsStream = newMap.entrySet().stream()
-              .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue()));
-
-      command = Stream.concat(commandStreamInit, fieldsStream).toArray(String[]::new);
-      GearsBuilder.execute(command);
+      newMap.put(key, convertedVal);
     }
+
+    Stream<String> fieldsStream = newMap.entrySet().stream()
+            .flatMap(entry -> Stream.of(entry.getKey(), entry.getValue()));
+
+    command = Stream.concat(commandStreamInit, fieldsStream).toArray(String[]::new);
+    GearsBuilder.execute(command);
   }
 
   public Object getObject(String entetyName, Serializable pk) throws Exception {
