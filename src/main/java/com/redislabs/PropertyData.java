@@ -5,7 +5,7 @@ import org.hibernate.type.TimestampType;
 import org.hibernate.type.Type;
 
 import java.io.Serializable;
-import java.sql.Timestamp;
+import java.sql.Date;
 
 public class PropertyData implements Serializable{
 
@@ -43,7 +43,7 @@ public class PropertyData implements Serializable{
       // try first to parse as timestamp
       try {
         long timestamp = Long.parseLong(val);
-        return new Timestamp(timestamp);
+        return new Date(timestamp);
       }catch(Exception e) {
         
       }
