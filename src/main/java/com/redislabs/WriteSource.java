@@ -25,24 +25,28 @@ public class WriteSource extends Source{
   private int timeout;
   
   private boolean writeThrough;
+  boolean writeOnChange;
   
   public WriteSource() {
     super();
   }
   
-  public WriteSource(String name, String connector, String xmlDef, boolean writeThrough, int timeout) {
+  public WriteSource(String name, String connector, String xmlDef, boolean writeThrough, int timeout, boolean writeOnChange) {
     super(connector, name, xmlDef);
     this.writeThrough = writeThrough;
     this.timeout = timeout;
+    this.writeOnChange = writeOnChange;
     
     Connector c = getConnectorObj();
     
     this.streamName = String.format("_Stream-%s-%s", connector, c.getUuid());
    
     KeysReader reader = new KeysReader().
-        setPattern(getHashPrefix() + ":*").
-        //setEventTypes(new String[] {"hset", "hmset", "hincrbyfloat", "hincrby", "hdel", "del", "change"});
-        setEventTypes(new String[] {"hset", "hmset", "hincrbyfloat", "hincrby", "hdel", "del"});
+        setPattern(getHashPrefix() + ":*");
+    if ( writeOnChange )
+        reader.setEventTypes(new String[] {"hset", "hmset", "hincrbyfloat", "hincrby", "hdel", "del", "change"});
+    else
+        reader.setEventTypes(new String[] {"hset", "hmset", "hincrbyfloat", "hincrby", "hdel", "del"});
 
     if(writeThrough) {
       /*
@@ -212,6 +216,9 @@ public class WriteSource extends Source{
 
   public int getTimeout() {
     return timeout;
+  }
+  public boolean getWriteOnChange() {
+    return writeOnChange;
   }
 
   public void setTimeout(int timeout) {

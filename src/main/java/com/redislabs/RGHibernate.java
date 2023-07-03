@@ -16,10 +16,7 @@ import java.lang.reflect.Method;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.util.Collection;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 
 public class RGHibernate implements Closeable, Serializable {
@@ -100,9 +97,6 @@ public class RGHibernate implements Closeable, Serializable {
   private void generateSession() {
     registry = new StandardServiceRegistryBuilder()
         .configure(InMemoryURLFactory.getInstance().build("configuration", xmlConf)).build();
-    //String dbpass = "1234";
-    //registry = new StandardServiceRegistryBuilder()
-     //       .configure(InMemoryURLFactory.getInstance().build("configuration", xmlConf.replaceAll("(connection\\.password\">)[^<]*", "$1" + dbpass))).build();
     MetadataSources sources = new MetadataSources(registry);
     Collection<String> srcs = this.sources.values();
     for (String src : srcs) {

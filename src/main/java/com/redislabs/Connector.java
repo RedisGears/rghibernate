@@ -8,10 +8,13 @@ import gears.readers.StreamReader;
 import gears.readers.StreamReader.FailurePolicy;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
+import org.hibernate.TransactionException;
 import org.hibernate.boot.registry.StandardServiceInitiator;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
 import org.hibernate.boot.registry.internal.StandardServiceRegistryImpl;
+import org.hibernate.exception.JDBCConnectionException;
 import org.hibernate.service.Service;
+import org.hibernate.service.spi.ServiceException;
 import org.hibernate.service.spi.ServiceRegistryImplementor;
 
 import java.io.Serializable;
@@ -93,14 +96,16 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
   private int batchSize;
   private int duration;
   private int retryInterval;
+  private boolean errorsToDLQ;
   
   public transient ConcurrentLinkedDeque<WriteThroughMD> queue = null;
 
   public Connector() {}
   
-  public Connector(String name, String xmlDef, int batchSize, int duration, int retryInterval) {
+  public Connector(String name, String xmlDef, int batchSize, int duration, int retryInterval, boolean errorsToDLQ) {
     this.name = name;
     this.xmlDef = xmlDef;
+    this.errorsToDLQ = errorsToDLQ;
     
     System.setProperty("javax.xml.bind.JAXBContextFactory", "org.eclipse.persistence.jaxb.JAXBContextFactory");
     Thread.currentThread().setContextClassLoader(WriteBehind.class.getClassLoader());
@@ -127,7 +132,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
         .setPattern(streamName)
         .setBatchSize(batchSize)
         .setDuration(duration)
-        .setFailurePolicy(FailurePolicy.CONTINUE)
+        .setFailurePolicy(FailurePolicy.RETRY)
         .setFailureRertyInterval(retryInterval);
 
     GearsBuilder<HashMap<String,Object>> builder = GearsBuilder.CreateGearsBuilder(streamReader, String.format("%s connector", name));
@@ -248,27 +253,26 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
         Transaction transaction = session.beginTransaction();
         boolean isMerge = true;
 
-        int idx = -1;
-        for(Map<String, Object> r: record) {
-          idx++;
-          lastStreamId = new String((byte[])r.get("id"));
+        for (int idx = 0; idx < record.size(); ++idx) {
+          Map<String, Object> r = record.get(idx);
+          lastStreamId = new String((byte[]) r.get("id"));
           Map<String, Object> value = (Map<String, Object>) r.get("value");
           Map<String, Object> map = value.entrySet().stream()
                   .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue()));
-          String sourceName = (String)map.remove(SOURCE_STR);
-          
-          String event = (String)map.remove(EVENT_STR);
-          if(event.charAt(0) != 'd') {
-            if(!isMerge) {
+          String sourceName = (String) map.remove(SOURCE_STR);
+
+          String event = (String) map.remove(EVENT_STR);
+          if (event.charAt(0) != 'd') {
+            if (!isMerge) {
               transaction.commit();
               session.clear();
               transaction = session.beginTransaction();
               isMerge = true;
               lastCommittedIdx = idx - 1;
             }
-            session.merge((String)map.remove(ENTETY_NAME_STR), map);
-          }else {
-            if(isMerge) {
+            session.merge((String) map.remove(ENTETY_NAME_STR), map);
+          } else {
+            if (isMerge) {
               transaction.commit();
               session.clear();
               transaction = session.beginTransaction();
@@ -276,30 +280,39 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
               lastCommittedIdx = idx - 1;
             }
             Source source = Source.getSource(sourceName);
-            Object o = session.get((String)map.remove(ENTETY_NAME_STR), (Serializable)map.get(source.getIdProperty().getName()));
+            Object o = session.get((String) map.remove(ENTETY_NAME_STR), (Serializable) map.get(source.getIdProperty().getName()));
             // o can be null on hdel that removed the last field
-            if(o != null) {
+            if (o != null) {
               session.delete(o);
             }
           }
         }
-        
+
         transaction.commit();
         session.clear();
-      }catch (Exception e) {
-        msg = String.format("Failed commiting transaction error='%s'", e);
+      }
+      catch (TransactionException|JDBCConnectionException|ServiceException ex) {
+        msg = String.format("Failed committing transaction error='%s'", ex);
+        GearsBuilder.log(msg, LogLevel.WARNING);
+        lastStreamId = null;
+        cause = ex;
+        connector.closeSession();
+
+      }
+      catch (Exception e) {
+        msg = String.format("Failed committing transaction error='%s'", e);
         GearsBuilder.log(msg, LogLevel.WARNING);
 
-        //connector.closeSession();
+        lastStreamId = null;
+        cause = e;
+
         if ( connector.getSession().getTransaction().isActive() ) {
           connector.getSession().getTransaction().rollback();
         }
 
         connector.getSession().clear();
-        lastStreamId = null;
-        cause = e;
-
         retry(record.subList(lastCommittedIdx + 1, record.size()));
+        msg = null;
       }
       
       while(!queue.isEmpty()) {
@@ -496,6 +509,10 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
 
   public int getRetryInterval() {
     return retryInterval;
+  }
+
+  public boolean getErrorsToDLQ() {
+    return errorsToDLQ;
   }
 
   public void setName(String name) {
