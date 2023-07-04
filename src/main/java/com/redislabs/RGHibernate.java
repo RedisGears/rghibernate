@@ -1,6 +1,8 @@
 package com.redislabs;
 
 import gears.GearsBuilder;
+import gears.LogLevel;
+
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.Metadata;
@@ -95,8 +97,18 @@ public class RGHibernate implements Closeable, Serializable {
   }
 
   private void generateSession() {
+    String generatedXmlConf = xmlConf;
+    try {
+      Object[] res = (Object[])  GearsBuilder.execute("RG.TRIGGER", "rghibernateGetPassword");
+      String dbpass = (String) res[0];
+      generatedXmlConf = generatedXmlConf.replaceAll("(connection\\.password\">)[^<]*", "$1" + dbpass);
+    } catch (Exception e) {
+      GearsBuilder.log(String.format("Failing generating password using 'RG.TRIGGER rghibernateGetPassword' using regular xml configuration, %s.", e), LogLevel.VERBOSE);
+    } finally {
+      Thread.currentThread().setContextClassLoader(RGHibernate.class.getClassLoader());
+    }
     registry = new StandardServiceRegistryBuilder()
-        .configure(InMemoryURLFactory.getInstance().build("configuration", xmlConf)).build();
+        .configure(InMemoryURLFactory.getInstance().build("configuration", generatedXmlConf)).build();
     MetadataSources sources = new MetadataSources(registry);
     Collection<String> srcs = this.sources.values();
     for (String src : srcs) {
