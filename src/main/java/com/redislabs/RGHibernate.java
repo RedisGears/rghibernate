@@ -97,11 +97,11 @@ public class RGHibernate implements Closeable, Serializable {
   }
 
   private void generateSession() {
-    String generatedXmlConf = xmlConf;
+    String generatedXmlConf = WriteBehind.setPasswordIfNeeded(xmlConf, name);
     
     try {
       String dbpass = WriteBehind.getPassword(name);
-      generatedXmlConf = generatedXmlConf.replaceAll("(connection\\.password\">)[^<]*", "$1" + dbpass);
+      generatedXmlConf = WriteBehind.setPasswordOnXmlDel(dbpass, generatedXmlConf);
     } catch (Exception e) {
       GearsBuilder.log(String.format("Failing generating password using 'RG.TRIGGER rghibernateGetPassword' using regular xml configuration, %s.", e), LogLevel.VERBOSE);
     } finally {

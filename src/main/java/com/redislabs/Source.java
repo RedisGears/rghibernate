@@ -63,16 +63,7 @@ public abstract class Source implements OnRegisteredOperation, OnUnregisteredOpe
     this.xmlDef = xmlDef;
     this.propertyMappings = new HashMap<>();
     
-    String generatedXmlConf = RGHibernate.get(connector).getXmlConf();
-    
-    try {
-      String dbpass = WriteBehind.getPassword(name);
-      generatedXmlConf = generatedXmlConf.replaceAll("(connection\\.password\">)[^<]*", "$1" + dbpass);
-    } catch (Exception e) {
-      GearsBuilder.log(String.format("Failing generating password using 'RG.TRIGGER rghibernateGetPassword' using regular xml configuration, %s.", e), LogLevel.VERBOSE);
-    } finally {
-      Thread.currentThread().setContextClassLoader(Source.class.getClassLoader());
-    }
+    String generatedXmlConf = WriteBehind.setPasswordIfNeeded(RGHibernate.get(connector).getXmlConf(), connector);
 
     StandardServiceRegistry tempRegistry = new StandardServiceRegistryBuilder()
          .configure( InMemoryURLFactory.getInstance().build("configuration", generatedXmlConf))
