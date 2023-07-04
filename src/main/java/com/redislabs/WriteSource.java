@@ -198,6 +198,8 @@ public class WriteSource extends Source{
     s.add(String.format("%s-{%s}", streamName, GearsBuilder.hashtag()));
     s.add("policy");
     s.add(writeThrough ? "writeThrough" : "writeBehind");
+    s.add("writeOnChangeEvent");
+    s.add(Boolean.toString(writeOnChange));
     if(writeThrough) {
       s.add("timeout");
       s.add(Integer.toString(timeout));
