@@ -311,8 +311,10 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
         }
 
         connector.getSession().clear();
-        retry(record.subList(lastCommittedIdx + 1, record.size()));
-        msg = null;
+        if ( errorsToDLQ ) {
+          retry(record.subList(lastCommittedIdx + 1, record.size()));
+          msg = null;
+        }
       }
       
       while(!queue.isEmpty()) {
