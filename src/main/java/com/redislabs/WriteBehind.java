@@ -92,8 +92,8 @@ public class WriteBehind{
   public static String setPasswordIfNeeded(String xmlDef, String connectorName) {
     String generatedXmlConf = xmlDef;
     try {
-      String dbpass = WriteBehind.getPassword(connectorName);
-      generatedXmlConf = WriteBehind.setPasswordOnXmlDel(dbpass, generatedXmlConf);
+      String dbpass = getPassword(connectorName);
+      generatedXmlConf = setPasswordOnXmlDel(dbpass, generatedXmlConf);
     } catch (Exception e) {
       GearsBuilder.log(String.format("Failing generating password using 'RG.TRIGGER rghibernateGetPassword' using regular xml configuration, %s.", e), LogLevel.VERBOSE);
     } finally {
