@@ -313,8 +313,16 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
 
           connector.getSession().clear();
 
-          retry(record.subList(lastCommittedIdx + 1, record.size()));
-          msg = null;
+          try {
+            retry(record.subList(lastCommittedIdx + 1, record.size()));
+            msg = null;
+          }
+          catch (Exception ex) {
+            msg = String.format("Failed committing transaction error='%s'", ex);
+            GearsBuilder.log(msg, LogLevel.WARNING);
+            cause = ex;
+          }
+
         }
         else {
           connector.closeSession();
@@ -361,11 +369,13 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
         }
         transaction.commit();
         session.clear();
+      }  catch (TransactionException|JDBCConnectionException|ServiceException ex) {
+          connector.closeSession();
+          throw ex;
       } catch (Exception e) {
         String msg = String.format("Failed retrying transaction error='%s'", e);
         GearsBuilder.log(msg, LogLevel.WARNING);
 
-        //connector.closeSession();
         if (connector.getSession().getTransaction().isActive()) {
           connector.getSession().getTransaction().rollback();
         }
