@@ -79,6 +79,11 @@ public class WriteBehind{
     return String.format("%d.%d.%d", major, minor, patch);
   }
 
+  public static String getPassword(String connectorName) {
+    Object[] res = (Object[])  GearsBuilder.execute("RG.TRIGGER", "rghibernateGetPassword", connectorName);
+    return (String) res[0];
+  }
+  
   public static void main(String[] args) throws Exception {
     String verStr = getStringVersion(VERSION);
     if(args.length == 1 && args[0].equals("version")) {
