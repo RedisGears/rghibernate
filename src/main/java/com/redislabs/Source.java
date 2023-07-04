@@ -66,7 +66,7 @@ public abstract class Source implements OnRegisteredOperation, OnUnregisteredOpe
     String generatedXmlConf = RGHibernate.get(connector).getXmlConf();
     
     try {
-      Object[] res = (Object[])  GearsBuilder.execute("RG.TRIGGER", "rghibernateGetPassword");
+      Object[] res = (Object[])  GearsBuilder.execute("RG.TRIGGER", "rghibernateGetPassword", connector);
       String dbpass = (String) res[0];
       generatedXmlConf = generatedXmlConf.replaceAll("(connection\\.password\">)[^<]*", "$1" + dbpass);
     } catch (Exception e) {
