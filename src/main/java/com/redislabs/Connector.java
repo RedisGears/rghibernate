@@ -560,6 +560,9 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
   public void setRetryInterval(int retryInterval) {
     this.retryInterval = retryInterval;
   }
-  
+
+  public void setErrorsToDLQ(boolean errorsToDLQ) {
+    this.errorsToDLQ = errorsToDLQ;
+  }
   
 }

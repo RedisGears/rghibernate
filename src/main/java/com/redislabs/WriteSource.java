@@ -232,4 +232,8 @@ public class WriteSource extends Source{
   public void setWriteThrough(boolean writeThrough) {
     this.writeThrough = writeThrough;
   }
+
+  public void setWriteOnChange(boolean writeOnChange) {
+    this.writeOnChange = writeOnChange;
+  }
 }
