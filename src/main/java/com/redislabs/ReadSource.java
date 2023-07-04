@@ -1,5 +1,11 @@
 package com.redislabs;
 
+import gears.ExecutionMode;
+import gears.GearsBuilder;
+import gears.operations.ForeachOperation;
+import gears.readers.KeysReader;
+import gears.records.KeysReaderRecord;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -8,12 +14,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
-
-import gears.ExecutionMode;
-import gears.GearsBuilder;
-import gears.operations.ForeachOperation;
-import gears.readers.KeysReader;
-import gears.records.KeysReaderRecord;
 
 public class ReadSource extends Source implements ForeachOperation<KeysReaderRecord>{
 
@@ -58,7 +58,7 @@ public class ReadSource extends Source implements ForeachOperation<KeysReaderRec
     try {
       res = (Map<String, Object>)getConnectorObj().getObject(getHashPrefix(), (Serializable)pk);
     } catch (Exception e) {
-      GearsBuilder.overrideReply(String.format("-ERR %s", e.toString()));
+      GearsBuilder.overrideReply(String.format("-ERR %s", e));
       throw e;
     }
     if (res != null) {

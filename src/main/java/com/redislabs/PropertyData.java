@@ -1,11 +1,11 @@
 package com.redislabs;
 
-import java.io.Serializable;
-import java.sql.Date;
-
 import org.hibernate.type.AbstractStandardBasicType;
 import org.hibernate.type.DbTimestampType;
 import org.hibernate.type.Type;
+
+import java.io.Serializable;
+import java.sql.Date;
 
 public class PropertyData implements Serializable{
 

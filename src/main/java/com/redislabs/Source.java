@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import gears.LogLevel;
 import org.hibernate.boot.Metadata;
 import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.registry.StandardServiceRegistry;
@@ -61,11 +62,11 @@ public abstract class Source implements OnRegisteredOperation, OnUnregisteredOpe
     this.name = name;
     this.xmlDef = xmlDef;
     this.propertyMappings = new HashMap<>();
-    
+
     StandardServiceRegistry tempRegistry = new StandardServiceRegistryBuilder()
-        .configure( InMemoryURLFactory.getInstance().build("configuration", RGHibernate.get(connector).getXmlConf()))
+         .configure( InMemoryURLFactory.getInstance().build("configuration", RGHibernate.get(connector).getXmlConf()))
         .build();
-    
+
     MetadataSources tempSources = new MetadataSources(tempRegistry);
     tempSources.addURL(InMemoryURLFactory.getInstance().build("mapping", xmlDef));
     Metadata metadata = tempSources.getMetadataBuilder().build();
