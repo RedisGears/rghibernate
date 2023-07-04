@@ -38,7 +38,7 @@ jobs:
           docker run -d -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=yes -v `pwd`/setup-mysql:/docker-entrypoint-initdb.d/setup.sh -p 3306:3306 mariadb:10.4
           sleep 30
       - run: |
-          pip install rltest sqlalchemy
+          pip install rltest
           make tests
         env:
           JVM_OPTS: -Xmx3200m
