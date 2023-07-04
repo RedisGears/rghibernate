@@ -265,7 +265,7 @@ public class WriteBehind{
         GearsBuilder.log(String.format("Register source %s to connector %s", temp.getName(), temp.getConnector()));
         if(temp instanceof WriteSource) {
           WriteSource s = (WriteSource)temp;
-          new WriteSource(s.getName(), s.getConnector(), s.getXmlDef(), s.isWriteThrough(), s.getTimeout(), s.writeOnChange);
+          new WriteSource(s.getName(), s.getConnector(), s.getXmlDef(), s.isWriteThrough(), s.getTimeout(), s.getWriteOnChange());
         } else if(temp instanceof ReadSource) {
           ReadSource s = (ReadSource)temp;
           new ReadSource(s.getName(), s.getConnector(), s.getXmlDef(), s.getExpire());

@@ -473,7 +473,7 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
         "userName", userName, "dialect", dialect, "uuid", uuid,
         "registrationId", registrationId, "batchSize", Integer.toString(batchSize),
         "duration", Integer.toString(duration), "retryInterval", Integer.toString(retryInterval),
-        "streamName", expectedStreamName, "pendingClients", Integer.toString(queue.size())));
+        "streamName", expectedStreamName, "pendingClients", Integer.toString(queue.size()), "errorsToDLQ", Boolean.toString(getErrorsToDLQ())));
     Long backlog = (Long)GearsBuilder.execute("xlen", expectedStreamName);
     s.add("backlog");
     s.add(Long.toString(backlog));
