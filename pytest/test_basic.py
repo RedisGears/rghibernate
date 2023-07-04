@@ -60,7 +60,7 @@ class MysqlBackend:
         if os.path.isfile('/usr/sbin/mariadbd'):
             service = 'mariadb'
         else:
-            service = 'mysql-server'
+            service = 'mysql'
         self.SERVICE = service
         subprocess.Popen(['/bin/bash', 'service', self.SERVICE, 'restart'], stdout=subprocess.PIPE).wait()
 
@@ -150,12 +150,16 @@ class genericTest:
 
         if os.path.isfile('/var/opt/redislabs/lib/modules/redisgears.so'):
             modpath = '/var/opt/redislabs/lib/modules/redisgears.so'
+            pluginPath = '/var/opt/redislabs/modules/rg/plugin/gears_jvm.so'
+            jvmOptions = '-Djava.class.path=/var/opt/redislabs/modules/rg/gear_runtime-jar-with-dependencies.jar'
+            jvmDir = '/var/opt/redislabs/modules/rg/OpenJDK/jdk-11.0.9.1+1'
         else:
             modpath = '../bin/RedisGears/redisgears.so'
+            pluginPath = '../../bin/RedisGears/plugins/jvmplugin/src/gears_jvm.so'
+            jvmOptions = '-Djava.class.path=../../bin/RedisGears/plugins/jvmplugin/gears_runtime/target/gear_runtime-jar-with-dependencies.jar'
+            jvmDir = '../../bin/RedisGears/plugins/jvmplugin/bin/OpenJDK/jdk-17.0.7+7'
 
-        pluginPath = '/var/opt/redislabs/modules/rg/plugin/gears_jvm.so'
-        jvmOptions = '-Djava.class.path=/var/opt/redislabs/modules/rg/gear_runtime-jar-with-dependencies.jar'
-        jvmDir = '/var/opt/redislabs/modules/rg/OpenJDK/jdk-11.0.9.1+1'
+        
 
         self.env = Env(module=modpath, moduleArgs='Plugin %s JvmOptions %s JvmPath %s' % (pluginPath, jvmOptions, jvmDir))
         with open('../target/rghibernate-jar-with-dependencies.jar', 'rb') as f:
