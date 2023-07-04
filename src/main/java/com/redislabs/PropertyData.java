@@ -4,7 +4,7 @@ import java.io.Serializable;
 import java.sql.Date;
 
 import org.hibernate.type.AbstractStandardBasicType;
-import org.hibernate.type.TimestampType;
+import org.hibernate.type.DbTimestampType;
 import org.hibernate.type.Type;
 
 public class PropertyData implements Serializable{
@@ -39,7 +39,7 @@ public class PropertyData implements Serializable{
       // best effort, keep it as string.
       return val;
     }
-    if(this.type instanceof TimestampType) {
+    if(this.type instanceof DbTimestampType) {
       // try first to parse as timestamp
       try {
         long timestamp = Long.parseLong(val);
@@ -52,7 +52,7 @@ public class PropertyData implements Serializable{
   }
   
   public String convertToStr(Object val) {
-    if(this.type instanceof TimestampType && val instanceof java.sql.Timestamp) {
+    if(this.type instanceof DbTimestampType && val instanceof java.sql.Timestamp) {
       // try first to parse as timestamp
       try {
         return Long.toString(((java.sql.Timestamp)val).getTime());

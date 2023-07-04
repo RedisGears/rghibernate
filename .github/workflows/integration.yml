@@ -18,7 +18,7 @@ jobs:
       - name: Set up publishing to maven central
         uses: actions/setup-java@v2
         with:
-          java-version: '8'
+          java-version: '11'
           distribution: 'temurin'
       - name: install python
         uses: actions/setup-python@v2
