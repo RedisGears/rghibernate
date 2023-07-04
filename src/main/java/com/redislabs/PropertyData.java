@@ -52,7 +52,7 @@ public class PropertyData implements Serializable{
   }
   
   public String convertToStr(Object val) {
-    if(this.type instanceof TimestampType && val instanceof java.sql.Timestamp) {
+    if(this.type instanceof DbTimestampType && val instanceof java.sql.Timestamp) {
       // try first to parse as timestamp
       try {
         return Long.toString(((java.sql.Timestamp)val).getTime());
