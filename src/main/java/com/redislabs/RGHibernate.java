@@ -99,15 +99,6 @@ public class RGHibernate implements Closeable, Serializable {
   private void generateSession() {
     String generatedXmlConf = WriteBehind.setPasswordIfNeeded(xmlConf, name);
     
-    try {
-      String dbpass = WriteBehind.getPassword(name);
-      generatedXmlConf = WriteBehind.setPasswordOnXmlDel(dbpass, generatedXmlConf);
-    } catch (Exception e) {
-      GearsBuilder.log(String.format("Failing generating password using 'RG.TRIGGER rghibernateGetPassword' using regular xml configuration, %s.", e), LogLevel.VERBOSE);
-    } finally {
-      Thread.currentThread().setContextClassLoader(RGHibernate.class.getClassLoader());
-    }
-    
     registry = new StandardServiceRegistryBuilder()
         .configure(InMemoryURLFactory.getInstance().build("configuration", generatedXmlConf)).build();
     MetadataSources sources = new MetadataSources(registry);
