@@ -306,14 +306,18 @@ MapOperation<HashMap<String, Object>, HashMap<String, Object>>{
         lastStreamId = null;
         cause = e;
 
-        if ( connector.getSession().getTransaction().isActive() ) {
-          connector.getSession().getTransaction().rollback();
-        }
-
-        connector.getSession().clear();
         if ( errorsToDLQ ) {
+          if ( connector.getSession().getTransaction().isActive() ) {
+            connector.getSession().getTransaction().rollback();
+          }
+
+          connector.getSession().clear();
+
           retry(record.subList(lastCommittedIdx + 1, record.size()));
           msg = null;
+        }
+        else {
+          connector.closeSession();
         }
       }
       
