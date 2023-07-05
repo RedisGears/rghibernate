@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import gears.ExecutionMode;
 import gears.GearsBuilder;
+import gears.LogLevel;
 import gears.operations.FlatMapOperation;
 import gears.readers.CommandReader;
 
@@ -79,6 +80,28 @@ public class WriteBehind{
     return String.format("%d.%d.%d", major, minor, patch);
   }
 
+  static String getPassword(String connectorName) {
+    Object[] res = (Object[])  GearsBuilder.execute("RG.TRIGGER", "rghibernateGetPassword", connectorName);
+    return (String) res[0];
+  }
+  
+  static String setPasswordOnXmlDel(String password, String xmlDef) {
+    return xmlDef.replaceAll("(connection\\.password\">)[^<]*", "$1" + password);
+  }
+
+  public static String setPasswordIfNeeded(String xmlDef, String connectorName) {
+    String generatedXmlConf = xmlDef;
+    try {
+      String dbpass = getPassword(connectorName);
+      generatedXmlConf = setPasswordOnXmlDel(dbpass, generatedXmlConf);
+    } catch (Exception e) {
+      GearsBuilder.log(String.format("Failing generating password using 'RG.TRIGGER rghibernateGetPassword' using regular xml configuration, %s.", e), LogLevel.VERBOSE);
+    } finally {
+      Thread.currentThread().setContextClassLoader(RGHibernate.class.getClassLoader());
+    }
+    return generatedXmlConf;
+  }
+  
   public static void main(String[] args) throws Exception {
     String verStr = getStringVersion(VERSION);
     if(args.length == 1 && args[0].equals("version")) {

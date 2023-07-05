@@ -1,6 +1,8 @@
 package com.redislabs;
 
 import gears.GearsBuilder;
+import gears.LogLevel;
+
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.Metadata;
@@ -95,8 +97,10 @@ public class RGHibernate implements Closeable, Serializable {
   }
 
   private void generateSession() {
+    String generatedXmlConf = WriteBehind.setPasswordIfNeeded(xmlConf, name);
+    
     registry = new StandardServiceRegistryBuilder()
-        .configure(InMemoryURLFactory.getInstance().build("configuration", xmlConf)).build();
+        .configure(InMemoryURLFactory.getInstance().build("configuration", generatedXmlConf)).build();
     MetadataSources sources = new MetadataSources(registry);
     Collection<String> srcs = this.sources.values();
     for (String src : srcs) {

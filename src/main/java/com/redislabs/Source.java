@@ -62,9 +62,11 @@ public abstract class Source implements OnRegisteredOperation, OnUnregisteredOpe
     this.name = name;
     this.xmlDef = xmlDef;
     this.propertyMappings = new HashMap<>();
+    
+    String generatedXmlConf = WriteBehind.setPasswordIfNeeded(RGHibernate.get(connector).getXmlConf(), connector);
 
     StandardServiceRegistry tempRegistry = new StandardServiceRegistryBuilder()
-         .configure( InMemoryURLFactory.getInstance().build("configuration", RGHibernate.get(connector).getXmlConf()))
+         .configure( InMemoryURLFactory.getInstance().build("configuration", generatedXmlConf))
         .build();
 
     MetadataSources tempSources = new MetadataSources(tempRegistry);
