@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 
 public class WriteBehind{
 
-  public static final int VERSION = 0x00010200;
+  public static final int VERSION = 0x00010201;
   public static final String DESCRIPTION = "A write behind/read through recipe for RedisGears JVM leverage hibernate for external db conectivity.";
 
   public static class UpdateInfo{
